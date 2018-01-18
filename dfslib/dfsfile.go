@@ -1,7 +1,7 @@
 package dfslib
 
 type File struct {
-	version string
+	Version string
 }
 
 func (t *File) Read(chunkNum uint8, chunk *Chunk) error {

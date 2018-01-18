@@ -10,6 +10,7 @@ package dfslib
 
 import (
 	"fmt"
+	"log"
 	"net"
 	"net/rpc"
 )
@@ -77,6 +78,13 @@ func (e BadFilenameError) Error() string {
 	return fmt.Sprintf("DFS: Filename [%s] includes illegal characters or has the wrong length", string(e))
 }
 
+// Contains filename
+type FileUnavailableError string
+
+func (e FileUnavailableError) Error() string {
+	return fmt.Sprintf("DFS: Filename [%s] is unavailable", string(e))
+}
+
 // Contains local path
 type LocalPathError string
 
@@ -141,6 +149,7 @@ type DFS interface {
 	// Can return the following errors:
 	// - OpenWriteConflictError (in WRITE mode)
 	// - DisconnectedError (in READ,WRITE modes)
+	// - FileUnavailableError (in READ,WRITE modes)
 	// - FileDoesNotExistError (in DREAD mode)
 	// - BadFilenameError (if filename contains non alpha-numeric chars or is not 1-16 chars long)
 	Open(fname string, mode FileMode) (f DFSFile, err error)
@@ -171,9 +180,21 @@ func MountDFS(serverAddr string, localIP string, localPath string) (dfs DFS, err
 	// For now return LocalPathError
 	conn, err := net.Dial("tcp", serverAddr)
 	if err != nil {
+		log.Println("Failed to establish connection to server: ", serverAddr)
+	}
+	connDFS := &ConnDFS{serverRPC: rpc.NewClient(conn)}
+	var clientListener string
+
+	err = connDFS.serverRPC.Call("ClientToServer.CreateListenerClient", localIP, &clientListener)
+	if err != nil {
 		fmt.Println(err)
 	}
-	connDFS := &ConnDFS{client: rpc.NewClient(conn)}
-	fmt.Println(connDFS.LocalFileExists("hi"))
-	return nil, LocalPathError(localPath)
+
+	clientConn, err := net.Dial("tcp", clientListener)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	connDFS.clientRPC = rpc.NewClient(clientConn)
+	return connDFS, nil
 }

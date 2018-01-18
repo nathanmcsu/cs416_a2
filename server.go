@@ -8,11 +8,9 @@ import (
 	"os"
 
 	"./dfslib"
+	"./metadata"
+	"./rpcDefs"
 )
-
-func registerFile(server *rpc.Server, file dfslib.DFSFile) {
-	server.Register(file)
-}
 
 func main() {
 	args := os.Args[1:]
@@ -22,14 +20,18 @@ func main() {
 	localPort := args[0]
 	server := rpc.NewServer()
 
-	file := new(dfslib.File)
-	// connDFS := new(dfslib.ConnDFS)
-	server.Register(file)
+	clientToServerRPC := new(rpcDefs.ClientToServer)
+
+	server.Register(clientToServerRPC)
 	tcpConn, err := net.Listen("tcp", localPort)
 	if err != nil {
 		log.Fatal("Failed to establish TCP:", err)
 	}
 	fmt.Println("Listening on: ", localPort)
+
+	FileMap := make(map[string]dfslib.File)
+
+	metadata.FileMap = FileMap
 	server.Accept(tcpConn)
 
 }
