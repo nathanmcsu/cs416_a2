@@ -29,9 +29,8 @@ func main() {
 	}
 	fmt.Println("Listening on: ", localPort)
 
-	FileMap := make(map[string]dfslib.File)
-
-	metadata.FileMap = FileMap
+	metadata.FileMap = make(map[string]dfslib.File)
+	metadata.ClientMap = make(map[int]bool)
 	server.Accept(tcpConn)
 
 }

@@ -10,14 +10,25 @@ import (
 	"../metadata"
 )
 
-// Server to Client RPC
+// Client to Server RPC
 
 type ClientToServer rpc.Client
 
 func (t *ClientToServer) CheckGlobalFileExists(fname string, exists *bool) error {
-
 	_, ok := metadata.FileMap[fname]
 	*exists = ok
+	return nil
+}
+func (t *ClientToServer) GetNewCID(localPath string, cid *int) error {
+	newCID := len(metadata.ClientMap)
+	*cid = newCID
+	return nil
+}
+
+func (t *ClientToServer) MapAliveClient(cid int, total *int) error {
+	metadata.ClientMap[cid] = true
+	size := len(metadata.ClientMap)
+	*total = size
 	return nil
 }
 

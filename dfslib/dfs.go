@@ -5,8 +5,10 @@ import (
 )
 
 type ConnDFS struct {
-	serverRPC *rpc.Client
-	clientRPC *rpc.Client
+	ServerRPC *rpc.Client
+	ClientRPC *rpc.Client
+	IsOffline bool
+	ClientID  int
 }
 
 func (t *ConnDFS) LocalFileExists(fname string) (exists bool, err error) {
@@ -15,7 +17,7 @@ func (t *ConnDFS) LocalFileExists(fname string) (exists bool, err error) {
 
 func (t *ConnDFS) GlobalFileExists(fname string) (exists bool, err error) {
 	var isExists bool
-	t.serverRPC.Call("ClientToServer.CheckGlobalFileExists", fname, &isExists)
+	t.ServerRPC.Call("ClientToServer.CheckGlobalFileExists", fname, &isExists)
 	return isExists, nil
 }
 

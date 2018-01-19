@@ -9,11 +9,19 @@ file system (DFS) system to be used in assignment 2 of UBC CS 416
 package dfslib
 
 import (
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net"
 	"net/rpc"
+	"os"
 )
+
+type ClientMetaData struct {
+	ClientID   int
+	FilesArray []File
+}
 
 // A Chunk is the unit of reading/writing in DFS.
 type Chunk [32]byte
@@ -177,24 +185,69 @@ type DFS interface {
 // - Networking errors related to localIP or serverAddr
 func MountDFS(serverAddr string, localIP string, localPath string) (dfs DFS, err error) {
 	// TODO
-	// For now return LocalPathError
+
+	// Establish connection to server:
+	var isOffline bool
 	conn, err := net.Dial("tcp", serverAddr)
 	if err != nil {
 		log.Println("Failed to establish connection to server: ", serverAddr)
+		isOffline = true
 	}
-	connDFS := &ConnDFS{serverRPC: rpc.NewClient(conn)}
-	var clientListener string
 
-	err = connDFS.serverRPC.Call("ClientToServer.CreateListenerClient", localIP, &clientListener)
+	connDFS := &ConnDFS{IsOffline: isOffline}
+	if !isOffline {
+		connDFS.ServerRPC = rpc.NewClient(conn)
+	}
+
+	// First check if localPath has existing clientID:
+	metadata, err := os.Open(localPath + "metadata.dfs")
+
+	if err != nil && !isOffline {
+		// Not an existing connection, create a clientID
+		metadata, err := os.Create(localPath + "metadata.dfs")
+		if err != nil {
+			return nil, LocalPathError(localPath)
+		}
+		var cid int
+		err = connDFS.ServerRPC.Call("ClientToServer.GetNewCID", localPath, &cid)
+
+		var clientmeta = new(ClientMetaData)
+		clientmeta.ClientID = cid
+		connDFS.ClientID = cid
+
+		clientMetaByte, _ := json.MarshalIndent(clientmeta, "", " ")
+
+		metadata.Write(clientMetaByte)
+		metadata.Sync()
+
+	} else if err != nil && isOffline {
+		fmt.Println("Can't connect to server to establish a new client")
+	}
+
+	// Re-open if there was a new file created
+	metadata, _ = os.Open(localPath + "metadata.dfs")
+
+	// Read metadata
+	data, _ := ioutil.ReadAll(metadata)
+	var readmeta ClientMetaData
+	json.Unmarshal(data, &readmeta)
+
+	// Establish Server -> Client RPC
+	var clientListener string
+	err = connDFS.ServerRPC.Call("ClientToServer.CreateListenerClient", localIP, &clientListener)
 	if err != nil {
 		fmt.Println(err)
 	}
-
 	clientConn, err := net.Dial("tcp", clientListener)
 	if err != nil {
 		fmt.Println(err)
 	}
+	connDFS.ClientRPC = rpc.NewClient(clientConn)
 
-	connDFS.clientRPC = rpc.NewClient(clientConn)
+	var totalClients int
+	connDFS.ServerRPC.Call("ClientToServer.MapAliveClient", readmeta.ClientID, &totalClients)
+
+	//TODO: Start Heartbeats to Client
+
 	return connDFS, nil
 }
