@@ -7,9 +7,9 @@ import (
 	"net/rpc"
 	"os"
 
-	"./dfslib"
 	"./metadata"
 	"./rpcDefs"
+	"./sharedData"
 )
 
 func main() {
@@ -29,8 +29,8 @@ func main() {
 	}
 	fmt.Println("Listening on: ", localPort)
 
-	metadata.FileMap = make(map[string]dfslib.File)
-	metadata.ClientMap = make(map[int]bool)
+	metadata.FileMap = make(map[string]map[int]map[int]int)
+	metadata.ClientMap = make(map[int]sharedData.StoredDFSMessage)
 	server.Accept(tcpConn)
 
 }

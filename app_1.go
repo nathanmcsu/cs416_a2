@@ -22,12 +22,12 @@ func main() {
 
 	serverAddr := "127.0.0.1:8080"
 	localIP := "127.0.0.1"
-	localPath := "/home/nathan/Desktop/cs416/as2_app/app2/"
+	localPath := "/home/nathan/Desktop/cs416/as2_app/app1/"
 
 	// Connect to DFS.
 	dfs, err := dfslib.MountDFS(serverAddr, localIP, localPath)
 	if checkError(err) != nil {
-		return
+		// return
 	}
 
 	// Close the DFS on exit.
@@ -37,7 +37,7 @@ func main() {
 	// Check if hello.txt file exists in the global DFS.
 	exists, err := dfs.GlobalFileExists("helloworld")
 	if checkError(err) != nil {
-		return
+		// return
 	}
 
 	if exists {
@@ -48,7 +48,11 @@ func main() {
 	// Open the file (and create it if it does not exist) for writing.
 	f, err := dfs.Open("helloworld", dfslib.WRITE)
 	if checkError(err) != nil {
-		return
+		// return
+	}
+
+	for true {
+
 	}
 
 	// Close the file on exit.
@@ -62,12 +66,13 @@ func main() {
 	// Write the 0th chunk of the file.
 	err = f.Write(0, &chunk)
 	if checkError(err) != nil {
-		return
+		// return
 	}
 
 	// Read the 0th chunk of the file.
 	err = f.Read(0, &chunk)
 	checkError(err)
+
 }
 
 // If error is non-nil, print it out and return it.

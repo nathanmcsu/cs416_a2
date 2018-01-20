@@ -16,6 +16,9 @@ import (
 	"net"
 	"net/rpc"
 	"os"
+	"strconv"
+
+	"../sharedData"
 )
 
 type ClientMetaData struct {
@@ -195,6 +198,7 @@ func MountDFS(serverAddr string, localIP string, localPath string) (dfs DFS, err
 	}
 
 	connDFS := &ConnDFS{IsOffline: isOffline}
+	connDFS.ClientPath = localPath
 	if !isOffline {
 		connDFS.ServerRPC = rpc.NewClient(conn)
 	}
@@ -233,19 +237,38 @@ func MountDFS(serverAddr string, localIP string, localPath string) (dfs DFS, err
 	json.Unmarshal(data, &readmeta)
 
 	// Establish Server -> Client RPC
-	var clientListener string
-	err = connDFS.ServerRPC.Call("ClientToServer.CreateListenerClient", localIP, &clientListener)
+	clientIP := localIP + ":0"
+	clientAddr, err := net.ResolveTCPAddr("tcp", clientIP)
+	if err != nil {
+		log.Println(err)
+	}
+	tcpConn, err := net.ListenTCP("tcp", clientAddr)
+	if err != nil {
+		log.Println(err)
+	}
+	clientIP = localIP + ":" + strconv.Itoa(tcpConn.Addr().(*net.TCPAddr).Port)
+	log.Println("Client RCP IP: ", clientIP)
+	clientServer := rpc.NewServer()
+	serverToClient := new(ServerToClient)
+	clientServer.Register(serverToClient)
+
+	go clientServer.Accept(tcpConn)
+
+	var listenOk bool
+	err = connDFS.ServerRPC.Call("ClientToServer.CreateListenerClient", clientIP, &listenOk)
 	if err != nil {
 		fmt.Println(err)
 	}
-	clientConn, err := net.Dial("tcp", clientListener)
+	clientConn, err := net.Dial("tcp", clientIP)
 	if err != nil {
 		fmt.Println(err)
 	}
 	connDFS.ClientRPC = rpc.NewClient(clientConn)
-
 	var totalClients int
-	connDFS.ServerRPC.Call("ClientToServer.MapAliveClient", readmeta.ClientID, &totalClients)
+
+	storedDFS := &sharedData.StoredDFSMessage{ClientID: connDFS.ClientID, ClientRPC: clientIP, ClientPath: localPath}
+
+	connDFS.ServerRPC.Call("ClientToServer.MapAliveClient", storedDFS, &totalClients)
 
 	//TODO: Start Heartbeats to Client
 
