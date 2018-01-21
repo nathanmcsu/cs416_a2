@@ -1,7 +1,7 @@
 package dfslib
 
 type File struct {
-	Name          string
+	FName         string
 	FileChunks    [256]Chunk
 	ChunkVersions [256]int
 }

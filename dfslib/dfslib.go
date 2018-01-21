@@ -187,6 +187,7 @@ type DFS interface {
 // - LocalPathError
 // - Networking errors related to localIP or serverAddr
 func MountDFS(serverAddr string, localIP string, localPath string) (dfs DFS, err error) {
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	// TODO
 
 	// Establish connection to server:
@@ -196,16 +197,16 @@ func MountDFS(serverAddr string, localIP string, localPath string) (dfs DFS, err
 		log.Println("Failed to establish connection to server: ", serverAddr)
 		isOffline = true
 	}
-
-	connDFS := &ConnDFS{IsOffline: isOffline}
+	connDFS := &ConnDFS{IsOffline: isOffline, ServerIP: serverAddr}
 	connDFS.ClientPath = localPath
 	if !isOffline {
 		connDFS.ServerRPC = rpc.NewClient(conn)
 	}
 
+	// TODO: Check localPath (LocalPathError)
+
 	// First check if localPath has existing clientID:
 	metadata, err := os.Open(localPath + "metadata.dfs")
-
 	if err != nil && !isOffline {
 		// Not an existing connection, create a clientID
 		metadata, err := os.Create(localPath + "metadata.dfs")
@@ -225,7 +226,7 @@ func MountDFS(serverAddr string, localIP string, localPath string) (dfs DFS, err
 		metadata.Sync()
 
 	} else if err != nil && isOffline {
-		fmt.Println("Can't connect to server to establish a new client")
+		log.Println("Can't connect to server to establish a new client")
 	}
 
 	// Re-open if there was a new file created
@@ -235,42 +236,47 @@ func MountDFS(serverAddr string, localIP string, localPath string) (dfs DFS, err
 	data, _ := ioutil.ReadAll(metadata)
 	var readmeta ClientMetaData
 	json.Unmarshal(data, &readmeta)
+	connDFS.ClientID = readmeta.ClientID
 
-	// Establish Server -> Client RPC
-	clientIP := localIP + ":0"
-	clientAddr, err := net.ResolveTCPAddr("tcp", clientIP)
-	if err != nil {
-		log.Println(err)
+	if !isOffline {
+		// Establish Server -> Client RPC
+		clientIP := localIP + ":0"
+		clientAddr, err := net.ResolveTCPAddr("tcp", clientIP)
+		if err != nil {
+			log.Println(err)
+		}
+		tcpConn, err := net.ListenTCP("tcp", clientAddr)
+		if err != nil {
+			log.Println(err)
+		}
+		clientIP = localIP + ":" + strconv.Itoa(tcpConn.Addr().(*net.TCPAddr).Port)
+		log.Println("Client RCP IP: ", clientIP)
+		clientServer := rpc.NewServer()
+		serverToClient := new(ServerToClient)
+		clientServer.Register(serverToClient)
+
+		go clientServer.Accept(tcpConn)
+
+		// var listenOk bool
+		// err = connDFS.ServerRPC.Call("ClientToServer.CreateListenerClient", clientIP, &listenOk)
+		// if err != nil {
+		// 	fmt.Println(err)
+		// }
+
+		clientConn, err := net.Dial("tcp", clientIP)
+		if err != nil {
+			log.Println(err)
+		}
+		connDFS.ClientRPC = rpc.NewClient(clientConn)
+		var totalClients int
+
+		storedDFS := &sharedData.StoredDFSMessage{ClientID: connDFS.ClientID, ClientIP: clientIP, ClientPath: localPath}
+		connDFS.ClientIP = clientIP
+
+		connDFS.ServerRPC.Call("ClientToServer.MapAliveClient", storedDFS, &totalClients)
+
+		//TODO: Start Heartbeats to Client
 	}
-	tcpConn, err := net.ListenTCP("tcp", clientAddr)
-	if err != nil {
-		log.Println(err)
-	}
-	clientIP = localIP + ":" + strconv.Itoa(tcpConn.Addr().(*net.TCPAddr).Port)
-	log.Println("Client RCP IP: ", clientIP)
-	clientServer := rpc.NewServer()
-	serverToClient := new(ServerToClient)
-	clientServer.Register(serverToClient)
-
-	go clientServer.Accept(tcpConn)
-
-	var listenOk bool
-	err = connDFS.ServerRPC.Call("ClientToServer.CreateListenerClient", clientIP, &listenOk)
-	if err != nil {
-		fmt.Println(err)
-	}
-	clientConn, err := net.Dial("tcp", clientIP)
-	if err != nil {
-		fmt.Println(err)
-	}
-	connDFS.ClientRPC = rpc.NewClient(clientConn)
-	var totalClients int
-
-	storedDFS := &sharedData.StoredDFSMessage{ClientID: connDFS.ClientID, ClientRPC: clientIP, ClientPath: localPath}
-
-	connDFS.ServerRPC.Call("ClientToServer.MapAliveClient", storedDFS, &totalClients)
-
-	//TODO: Start Heartbeats to Client
 
 	return connDFS, nil
 }

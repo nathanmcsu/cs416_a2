@@ -13,6 +13,7 @@ import (
 )
 
 func main() {
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	args := os.Args[1:]
 	if len(args) != 1 {
 		log.Fatal("Usage: server.go [Client-incoming UDP ip:port]")
@@ -30,7 +31,8 @@ func main() {
 	fmt.Println("Listening on: ", localPort)
 
 	metadata.FileMap = make(map[string]map[int]map[int]int)
-	metadata.ClientMap = make(map[int]sharedData.StoredDFSMessage)
+	metadata.ClientMap = make(map[int]sharedData.StoredDFS)
+	metadata.ActiveFiles = make(map[string]int)
 	server.Accept(tcpConn)
 
 }

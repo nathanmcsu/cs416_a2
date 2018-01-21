@@ -45,11 +45,12 @@ func main() {
 		// return
 	}
 
-	// Open the file (and create it if it does not exist) for writing.
-	f, err := dfs.Open("helloworld", dfslib.WRITE)
+	// Open the file (and  create it if it does not exist) for writing.
+	f, err := dfs.Open("helloworld", dfslib.READ)
 	if checkError(err) != nil {
 		return
 	}
+	return
 
 	// Close the file on exit.
 	defer f.Close()
