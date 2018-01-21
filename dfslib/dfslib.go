@@ -133,7 +133,7 @@ type DFSFile interface {
 
 	// Closes the file/cleans up. Can return the following errors:
 	// - DisconnectedError
-	Close()
+	Close() (err error)
 }
 
 // Represents a connection to the DFS system.
@@ -231,7 +231,7 @@ func MountDFS(serverAddr string, localIP string, localPath string) (dfs DFS, err
 
 	// Re-open if there was a new file created
 	metadata, _ = os.Open(localPath + "metadata.dfs")
-
+	defer metadata.Close()
 	// Read metadata
 	data, _ := ioutil.ReadAll(metadata)
 	var readmeta ClientMetaData

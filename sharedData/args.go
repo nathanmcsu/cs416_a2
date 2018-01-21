@@ -37,3 +37,9 @@ type ArgFile struct {
 	FileChunks    [256][32]byte
 	ChunkVersions [256]int
 }
+
+type ReplicaEntry struct {
+	ClientID       int
+	VersionEntries [256]int
+	Fname          string
+}

@@ -71,8 +71,8 @@ func (t *ClientToServer) RetrieveLatestFile(fname string, argFile *sharedData.Ar
 					fileMessage.ClientID = cid
 					fileMessage.ClientPath = client.ClientPath
 
-					fmt.Println("Calling client: ", cid, "with IP: ", client.ClientIP)
-					fmt.Println("Chunk Index: ", chunkIndex)
+					//fmt.Println("Calling client: ", cid, "with IP: ", client.ClientIP)
+					//fmt.Println("Chunk Index: ", chunkIndex)
 
 					var clientFile []byte
 					var errOrTime bool
@@ -104,7 +104,7 @@ func (t *ClientToServer) RetrieveLatestFile(fname string, argFile *sharedData.Ar
 			}
 		}
 	}
-	log.Println(tempDFSFile.FileChunks)
+	// log.Println(tempDFSFile.FileChunks)
 	*argFile = tempDFSFile
 	return nil
 }
@@ -116,6 +116,15 @@ func (t *ClientToServer) AddNewFile(fileCMap sharedData.FileChunkMap, argok *boo
 		metadata.FileMap[fileCMap.FName] = fileCMap.ChunkMap
 	}
 	_, *argok = metadata.FileMap[fileCMap.FName]
+	return nil
+}
+
+func (t *ClientToServer) AddNewReplica(replicaEntryMessage sharedData.ReplicaEntry, argok *bool) error {
+	log.Println("AddNewReplica")
+	chunkMap := metadata.FileMap[replicaEntryMessage.Fname]
+	for chunkIndex, versionMap := range chunkMap {
+		versionMap[replicaEntryMessage.ClientID] = replicaEntryMessage.VersionEntries[chunkIndex]
+	}
 	return nil
 }
 

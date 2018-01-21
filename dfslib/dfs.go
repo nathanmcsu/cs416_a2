@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/rpc"
 	"os"
 
@@ -70,11 +71,46 @@ func (t *ConnDFS) Open(fname string, mode FileMode) (f DFSFile, err error) {
 
 		// Fetch File if READ or WRITE first, isOffline and READ/Write already checked
 		if mode == READ || mode == WRITE {
-
 			if fileExists {
 				// Retrieve file from server call
 				var argFile sharedData.ArgFile
-				t.ServerRPC.Call("ClientToServer.RetrieveLatestFile", fname, &argFile)
+				err = t.ServerRPC.Call("ClientToServer.RetrieveLatestFile", fname, &argFile)
+				if err != nil {
+					log.Println(err)
+				} else {
+					// Make client replica for file
+					file, _ := os.Create(t.ClientPath + fname + ".dfs")
+					// file, _ := os.Open(t.ClientPath + fname + ".dfs")
+
+					defer file.Close()
+
+					fileBytes, _ := json.Marshal(argFile.FileChunks)
+					log.Println(t.ClientPath + fname + ".dfs")
+					file.Write(fileBytes)
+					file.Sync()
+
+					file, _ = os.Open(t.ClientPath + fname + ".dfs")
+					data, _ := ioutil.ReadAll(file)
+					var testChunk [256]Chunk
+					json.Unmarshal(data, &testChunk)
+
+					dfsFile.FName = fname
+					dfsFile.FileChunks = testChunk
+
+					var versionEntries [256]int
+					for i := 0; i < len(versionEntries); i++ {
+						versionEntries[i] = argFile.ChunkVersions[i]
+					}
+
+					replicaEntryMessage := new(sharedData.ReplicaEntry)
+					replicaEntryMessage.ClientID = t.ClientID
+					replicaEntryMessage.VersionEntries = versionEntries
+					replicaEntryMessage.Fname = fname
+
+					var ok bool
+					t.ServerRPC.Call("ClientToServer.AddNewReplica", replicaEntryMessage, &ok)
+
+				}
 			} else {
 				// Create file locally
 				file, err := os.Create(t.ClientPath + fname + ".dfs")
@@ -92,12 +128,11 @@ func (t *ConnDFS) Open(fname string, mode FileMode) (f DFSFile, err error) {
 				}
 
 				blankByte, _ := json.Marshal(blankChunk)
-				fmt.Println(len(blankByte))
-				fmt.Println(len(blankChunk))
 				file.Write(blankByte)
 				file.Sync()
 
 				file, _ = os.Open(t.ClientPath + fname + ".dfs")
+				defer file.Close()
 				data, _ := ioutil.ReadAll(file)
 				var testChunk [256]Chunk
 				json.Unmarshal(data, &testChunk)
@@ -139,7 +174,7 @@ func (t *ConnDFS) Open(fname string, mode FileMode) (f DFSFile, err error) {
 	//  TODO
 	//		Write File contents to disk after successful acquire
 
-	return nil, FileDoesNotExistError("Really bad")
+	return dfsFile, nil
 }
 func (t *ConnDFS) UMountDFS() {
 

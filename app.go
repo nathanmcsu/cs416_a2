@@ -22,7 +22,7 @@ func main() {
 
 	serverAddr := "127.0.0.1:8080"
 	localIP := "127.0.0.1"
-	localPath := "/home/nathan/Desktop/cs416/as2_app/app2/"
+	localPath := "/home/nathan/Desktop/cs416/as2_app/app3/"
 
 	// Connect to DFS.
 	dfs, err := dfslib.MountDFS(serverAddr, localIP, localPath)
