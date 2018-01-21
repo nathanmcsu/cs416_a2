@@ -27,7 +27,7 @@ func main() {
 	// Connect to DFS.
 	dfs, err := dfslib.MountDFS(serverAddr, localIP, localPath)
 	if checkError(err) != nil {
-		return
+		// return
 	}
 
 	// Close the DFS on exit.
@@ -37,26 +37,33 @@ func main() {
 	// Check if hello.txt file exists in the global DFS.
 	exists, err := dfs.GlobalFileExists("helloworld")
 	if checkError(err) != nil {
-		return
-	}
-
-	if exists {
-		fmt.Println("File already exists, mission accomplished")
 		// return
 	}
 
-	// Open the file (and  create it if it does not exist) for writing.
-	f, err := dfs.Open("helloworld", dfslib.READ)
+	f, err := dfs.Open("helloworld", dfslib.DREAD)
 	if checkError(err) != nil {
 		return
 	}
-	return
+
+	var chunk dfslib.Chunk
+	err = f.Read(0, &chunk)
+	checkError(err)
+
+	if exists {
+		fmt.Println("File already exists, mission accomplished")
+		return
+	}
+
+	// Open the file (and  create it if it does not exist) for writing.
+	f, err = dfs.Open("helloworld", dfslib.WRITE)
+	if checkError(err) != nil {
+		return
+	}
 
 	// Close the file on exit.
 	defer f.Close()
 
 	// Create a chunk with a string message.
-	var chunk dfslib.Chunk
 	const str = "Hello friends!"
 	copy(chunk[:], str)
 

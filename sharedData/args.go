@@ -38,8 +38,17 @@ type ArgFile struct {
 	ChunkVersions [256]int
 }
 
+// Add client ID to FileMap for File
 type ReplicaEntry struct {
 	ClientID       int
 	VersionEntries [256]int
 	Fname          string
+}
+
+type WriteChunkMessage struct {
+	FName        string
+	ChunkIndex   int
+	ChunkVersion int
+	ChunkByte    [32]byte
+	ClientID     int
 }

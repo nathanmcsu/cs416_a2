@@ -26,6 +26,9 @@ func (t *ConnDFS) LocalFileExists(fname string) (exists bool, err error) {
 }
 
 func (t *ConnDFS) GlobalFileExists(fname string) (exists bool, err error) {
+	if t.IsOffline {
+		return false, DisconnectedError(t.ServerIP)
+	}
 	var isExists bool
 	t.ServerRPC.Call("ClientToServer.CheckGlobalFileExists", fname, &isExists)
 	return isExists, nil
@@ -40,14 +43,14 @@ func (t *ConnDFS) Open(fname string, mode FileMode) (f DFSFile, err error) {
 
 	// Populate dfsFile with the right data, dfsFile is return
 	var dfsFile File
-
+	dfsFile.Mode = mode
+	dfsFile.FName = fname
 	if t.IsOffline && (mode == WRITE || mode == READ) {
 		return nil, DisconnectedError(t.ServerIP)
 	}
 
 	if !t.IsOffline {
 		// Online
-
 		// Check if File exists first
 		var fileExists bool
 		err := t.ServerRPC.Call("ClientToServer.CheckGlobalFileExists", fname, &fileExists)
@@ -80,8 +83,6 @@ func (t *ConnDFS) Open(fname string, mode FileMode) (f DFSFile, err error) {
 				} else {
 					// Make client replica for file
 					file, _ := os.Create(t.ClientPath + fname + ".dfs")
-					// file, _ := os.Open(t.ClientPath + fname + ".dfs")
-
 					defer file.Close()
 
 					fileBytes, _ := json.Marshal(argFile.FileChunks)
@@ -90,6 +91,8 @@ func (t *ConnDFS) Open(fname string, mode FileMode) (f DFSFile, err error) {
 					file.Sync()
 
 					file, _ = os.Open(t.ClientPath + fname + ".dfs")
+					defer file.Close()
+
 					data, _ := ioutil.ReadAll(file)
 					var testChunk [256]Chunk
 					json.Unmarshal(data, &testChunk)
@@ -102,11 +105,11 @@ func (t *ConnDFS) Open(fname string, mode FileMode) (f DFSFile, err error) {
 						versionEntries[i] = argFile.ChunkVersions[i]
 					}
 
-					replicaEntryMessage := new(sharedData.ReplicaEntry)
-					replicaEntryMessage.ClientID = t.ClientID
-					replicaEntryMessage.VersionEntries = versionEntries
-					replicaEntryMessage.Fname = fname
-
+					replicaEntryMessage := &sharedData.ReplicaEntry{
+						ClientID:       t.ClientID,
+						VersionEntries: versionEntries,
+						Fname:          fname,
+					}
 					var ok bool
 					t.ServerRPC.Call("ClientToServer.AddNewReplica", replicaEntryMessage, &ok)
 
@@ -118,15 +121,7 @@ func (t *ConnDFS) Open(fname string, mode FileMode) (f DFSFile, err error) {
 					// Create file error
 				}
 
-				// need to input some weird data
-				var chunk Chunk
-				const str = "Hello friends!"
-				copy(chunk[:], str)
 				var blankChunk [256]Chunk
-				for i := 0; i < len(blankChunk); i += 3 {
-					blankChunk[i] = chunk
-				}
-
 				blankByte, _ := json.Marshal(blankChunk)
 				file.Write(blankByte)
 				file.Sync()
@@ -137,7 +132,6 @@ func (t *ConnDFS) Open(fname string, mode FileMode) (f DFSFile, err error) {
 				var testChunk [256]Chunk
 				json.Unmarshal(data, &testChunk)
 
-				dfsFile.FName = fname
 				dfsFile.FileChunks = testChunk
 
 				cidVersionMap := make(map[int]int)
@@ -157,23 +151,26 @@ func (t *ConnDFS) Open(fname string, mode FileMode) (f DFSFile, err error) {
 				t.ServerRPC.Call("ClientToServer.AddNewFile", fileCMap, &ok)
 			}
 		}
-	}
+	} else {
+		// Offline case should be only dread mode too
+		file, err := os.Open(t.ClientPath + fname + ".dfs")
+		defer file.Close()
+		if err != nil {
+			log.Println(err)
+			return nil, FileDoesNotExistError(fname)
+		}
+		data, err := ioutil.ReadAll(file)
+		if err != nil {
+			log.Println(err)
+		}
+		var fileChunks [256]Chunk
+		json.Unmarshal(data, &fileChunks)
+		dfsFile.FileChunks = fileChunks
 
-	switch mode {
-	case READ:
-		fmt.Println("Read mode")
-	case WRITE:
-		// Acquire lock
-		fmt.Println("Write Mode")
-	case DREAD:
-		// If server is up, acquire files
-		// else search local for file
-		fmt.Println("DREAD mode")
 	}
-
 	//  TODO
 	//		Write File contents to disk after successful acquire
-
+	dfsFile.ClientConn = *t
 	return dfsFile, nil
 }
 func (t *ConnDFS) UMountDFS() {

@@ -22,8 +22,13 @@ import (
 )
 
 type ClientMetaData struct {
-	ClientID   int
-	FilesArray []File
+	ClientID int
+	// Fname and Chunk Index
+	WriteLogs map[string]int
+}
+
+type ClientConnectionData struct {
+	connDFS ConnDFS
 }
 
 // A Chunk is the unit of reading/writing in DFS.
@@ -218,6 +223,7 @@ func MountDFS(serverAddr string, localIP string, localPath string) (dfs DFS, err
 
 		var clientmeta = new(ClientMetaData)
 		clientmeta.ClientID = cid
+		clientmeta.WriteLogs = make(map[string]int)
 		connDFS.ClientID = cid
 
 		clientMetaByte, _ := json.MarshalIndent(clientmeta, "", " ")

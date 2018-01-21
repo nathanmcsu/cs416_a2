@@ -145,3 +145,18 @@ func (t *ClientToServer) CheckWriterExistsAndAdd(writerAndFile sharedData.Writer
 	*writerExists = exists
 	return nil
 }
+
+func (t *ClientToServer) WriteChunk(writeChunkMessage sharedData.WriteChunkMessage, resChunkMessage *sharedData.WriteChunkMessage) error {
+	log.Println("WriteChunk")
+	chunkMap := metadata.FileMap[writeChunkMessage.FName]
+	versionMap := chunkMap[writeChunkMessage.ChunkIndex]
+	versionMap[writeChunkMessage.ClientID] = writeChunkMessage.ChunkVersion + 1
+
+	*resChunkMessage = sharedData.WriteChunkMessage{
+		FName:        writeChunkMessage.FName,
+		ChunkIndex:   writeChunkMessage.ChunkIndex,
+		ChunkVersion: versionMap[writeChunkMessage.ClientID],
+		ClientID:     writeChunkMessage.ClientID,
+	}
+	return nil
+}
