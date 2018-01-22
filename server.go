@@ -33,6 +33,8 @@ func main() {
 	metadata.FileMap = make(map[string]map[int]map[int]int)
 	metadata.ClientMap = make(map[int]sharedData.StoredDFS)
 	metadata.ActiveFiles = make(map[string]int)
+	metadata.ActiveWriteChunks = make(map[string]map[int]int)
+	metadata.ActiveClientMap = make(map[int]bool)
 	server.Accept(tcpConn)
 
 }

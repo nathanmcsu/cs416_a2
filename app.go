@@ -22,7 +22,7 @@ func main() {
 
 	serverAddr := "127.0.0.1:8080"
 	localIP := "127.0.0.1"
-	localPath := "/home/nathan/Desktop/cs416/as2_app/app3/"
+	localPath := "/home/nathan/Desktop/cs416/as2_app/app2/"
 
 	// Connect to DFS.
 	dfs, err := dfslib.MountDFS(serverAddr, localIP, localPath)
@@ -51,7 +51,7 @@ func main() {
 
 	if exists {
 		fmt.Println("File already exists, mission accomplished")
-		return
+		//return
 	}
 
 	// Open the file (and  create it if it does not exist) for writing.
@@ -59,7 +59,6 @@ func main() {
 	if checkError(err) != nil {
 		return
 	}
-
 	// Close the file on exit.
 	defer f.Close()
 
@@ -68,11 +67,10 @@ func main() {
 	copy(chunk[:], str)
 
 	// Write the 0th chunk of the file.
-	err = f.Write(0, &chunk)
+	err = f.Write(2, &chunk)
 	if checkError(err) != nil {
 		return
 	}
-
 	// Read the 0th chunk of the file.
 	err = f.Read(0, &chunk)
 	checkError(err)

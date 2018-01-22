@@ -48,15 +48,8 @@ func main() {
 	// Open the file (and create it if it does not exist) for writing.
 	f, err := dfs.Open("helloworld", dfslib.WRITE)
 	if checkError(err) != nil {
-		// return
+		return
 	}
-
-	for true {
-
-	}
-
-	// Close the file on exit.
-	defer f.Close()
 
 	// Create a chunk with a string message.
 	var chunk dfslib.Chunk
@@ -66,9 +59,13 @@ func main() {
 	// Write the 0th chunk of the file.
 	err = f.Write(0, &chunk)
 	if checkError(err) != nil {
-		// return
+		return
 	}
+	// Close the file on exit.
+	f.Close()
+	for true {
 
+	}
 	// Read the 0th chunk of the file.
 	err = f.Read(0, &chunk)
 	checkError(err)

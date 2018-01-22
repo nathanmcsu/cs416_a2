@@ -172,7 +172,7 @@ type DFS interface {
 
 	// Disconnects from the server. Can return the following errors:
 	// - DisconnectedError
-	UMountDFS()
+	UMountDFS() (err error)
 }
 
 // The constructor for a new DFS object instance. Takes the server's

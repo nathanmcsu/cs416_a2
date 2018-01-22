@@ -18,7 +18,15 @@ type File struct {
 }
 
 func (t File) Read(chunkNum uint8, chunk *Chunk) error {
-	// Check if currnet File has the most updated ChunkVersion
+	// Check if Read mode or dread mode
+	//		if dread, return chunk
+	//	if read:
+	//
+	// TODO:
+	// 		Check if there is a write, block until the write is done
+	// 		After done, check if current version is latest chunk version
+	//
+
 	return nil
 }
 func (t File) Write(chunkNum uint8, chunk *Chunk) error {
@@ -27,7 +35,19 @@ func (t File) Write(chunkNum uint8, chunk *Chunk) error {
 	if t.Mode != WRITE {
 		return BadFileModeError(t.Mode)
 	}
-	// TODO : DisconnectedError, check if Server is up
+	// DisconnectedError, check if Server is up
+	var isConnected bool
+	storedDFSMessage := &sharedData.StoredDFSMessage{
+		ClientIP:   t.ClientConn.ClientIP,
+		ClientID:   t.ClientConn.ClientID,
+		ClientPath: t.ClientConn.ClientPath,
+	}
+
+	err := t.ClientConn.ServerRPC.Call("ClientToServer.SyncHeartBeat", storedDFSMessage, &isConnected)
+
+	if err != nil || !isConnected {
+		return DisconnectedError(t.ClientConn.ServerIP)
+	}
 
 	// Steps:
 	//		-Tell server you are writing, to block any reads  TODO
@@ -36,6 +56,20 @@ func (t File) Write(chunkNum uint8, chunk *Chunk) error {
 	//			-Write to Server
 	//		-Get acknowledge of updated version (Check version number versus our own?)
 	// 		-Delete our log if version update, if not resend write request
+
+	//Tell server you are writing, to block any reads
+	writeChunkMessage := &sharedData.WriteChunkMessage{
+		FName:        t.FName,
+		ChunkIndex:   int(chunkNum),
+		ChunkVersion: t.ChunkVersions[chunkNum],
+		ClientID:     t.ClientConn.ClientID,
+	}
+
+	var canWrite bool
+	t.ClientConn.ServerRPC.Call("ClientToServer.BlockChunk", writeChunkMessage, &canWrite)
+	if !canWrite {
+		return DisconnectedError(t.ClientConn.ServerIP)
+	}
 
 	//Write Locally
 	file, err := os.OpenFile(t.ClientConn.ClientPath+t.FName+".dfs", os.O_WRONLY, os.ModePerm)
@@ -63,8 +97,10 @@ func (t File) Write(chunkNum uint8, chunk *Chunk) error {
 	}
 
 	data, _ = ioutil.ReadAll(metadata)
+	log.Println(data)
 	var readmeta ClientMetaData
 	json.Unmarshal(data, &readmeta)
+	log.Println(readmeta)
 	if readmeta.WriteLogs == nil {
 		readmeta.WriteLogs = make(map[string]int)
 	}
@@ -75,7 +111,7 @@ func (t File) Write(chunkNum uint8, chunk *Chunk) error {
 	metadata.Sync()
 
 	// Write to Server
-	writeChunkMessage := &sharedData.WriteChunkMessage{
+	writeChunkMessage = &sharedData.WriteChunkMessage{
 		FName:        t.FName,
 		ChunkIndex:   int(chunkNum),
 		ChunkVersion: t.ChunkVersions[chunkNum],
@@ -91,15 +127,16 @@ func (t File) Write(chunkNum uint8, chunk *Chunk) error {
 	t.ChunkVersions[chunkNum] = resChunkMessage.ChunkVersion
 
 	// Get rid of log entry TODO: Clean up, its deleting and remaking, find a way to overwrite
-	metadata, err = os.OpenFile(t.ClientConn.ClientPath+"metadata.dfs", os.O_WRONLY, os.ModePerm)
+	metadata2, err := os.OpenFile(t.ClientConn.ClientPath+"metadata.dfs", os.O_WRONLY, os.ModePerm)
 	if err != nil {
 		log.Println(err)
 	}
-	data, _ = ioutil.ReadAll(metadata)
+	data, _ = ioutil.ReadAll(metadata2)
 	json.Unmarshal(data, &readmeta)
 	metadata.Close()
 	os.Remove(t.ClientConn.ClientPath + "metadata.dfs")
 
+	log.Println(readmeta)
 	metadata, err = os.Create(t.ClientConn.ClientPath + "metadata.dfs")
 	defer metadata.Close()
 	delete(readmeta.WriteLogs, t.FName)
@@ -111,5 +148,26 @@ func (t File) Write(chunkNum uint8, chunk *Chunk) error {
 	return nil
 }
 func (t File) Close() error {
+	var isConnected bool
+	storedDFSMessage := &sharedData.StoredDFSMessage{
+		ClientIP:   t.ClientConn.ClientIP,
+		ClientID:   t.ClientConn.ClientID,
+		ClientPath: t.ClientConn.ClientPath,
+	}
+
+	err := t.ClientConn.ServerRPC.Call("ClientToServer.SyncHeartBeat", storedDFSMessage, &isConnected)
+
+	if err != nil || !isConnected {
+		return DisconnectedError(t.ClientConn.ServerIP)
+	}
+
+	writerAndFile := &sharedData.WriterAndFile{
+		Fname:    t.FName,
+		ClientID: t.ClientConn.ClientID,
+	}
+
+	var isOk bool
+	t.ClientConn.ServerRPC.Call("ClientToServer.CloseFile", writerAndFile, &isOk)
+
 	return nil
 }
