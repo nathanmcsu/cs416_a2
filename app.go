@@ -22,7 +22,7 @@ func main() {
 
 	serverAddr := "127.0.0.1:8080"
 	localIP := "127.0.0.1"
-	localPath := "/home/nathan/Desktop/cs416/as2_app/app2/"
+	localPath := "/home/nathan/Desktop/cs416/as2_app/app3/"
 
 	// Connect to DFS.
 	dfs, err := dfslib.MountDFS(serverAddr, localIP, localPath)
@@ -59,6 +59,7 @@ func main() {
 	if checkError(err) != nil {
 		return
 	}
+
 	// Close the file on exit.
 	defer f.Close()
 
@@ -67,7 +68,7 @@ func main() {
 	copy(chunk[:], str)
 
 	// Write the 0th chunk of the file.
-	err = f.Write(2, &chunk)
+	err = f.Write(3, &chunk)
 	if checkError(err) != nil {
 		return
 	}

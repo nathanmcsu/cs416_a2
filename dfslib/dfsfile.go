@@ -72,8 +72,7 @@ func (t File) Write(chunkNum uint8, chunk *Chunk) error {
 	}
 
 	//Write Locally
-	file, err := os.OpenFile(t.ClientConn.ClientPath+t.FName+".dfs", os.O_WRONLY, os.ModePerm)
-	defer file.Close()
+	file, err := os.Open(t.ClientConn.ClientPath + t.FName + ".dfs")
 	if err != nil {
 		log.Println(err)
 	}
@@ -83,32 +82,38 @@ func (t File) Write(chunkNum uint8, chunk *Chunk) error {
 
 	fileChunks[chunkNum] = *chunk
 	fileBytes, _ := json.Marshal(fileChunks)
-	_, err = file.Write(fileBytes)
+	writeHandle, err := os.OpenFile(t.ClientConn.ClientPath+t.FName+".dfs", os.O_WRONLY, os.ModePerm)
+	defer writeHandle.Close()
+	_, err = writeHandle.Write(fileBytes)
 	if err != nil {
 		log.Println(err)
 	}
-	file.Sync()
+	writeHandle.Sync()
 
 	// Write Log
-	metadata, err := os.OpenFile(t.ClientConn.ClientPath+"metadata.dfs", os.O_WRONLY, os.ModePerm)
+	metadata, err := os.Open(t.ClientConn.ClientPath + "metadata.dfs")
 	defer metadata.Close()
 	if err != nil {
 		log.Println(err)
 	}
-
 	data, _ = ioutil.ReadAll(metadata)
-	log.Println(data)
+
 	var readmeta ClientMetaData
 	json.Unmarshal(data, &readmeta)
-	log.Println(readmeta)
+
 	if readmeta.WriteLogs == nil {
 		readmeta.WriteLogs = make(map[string]int)
 	}
 	readmeta.WriteLogs[t.FName] = t.ChunkVersions[chunkNum] + 1
 
 	readmetaByte, _ := json.MarshalIndent(readmeta, "", " ")
-	metadata.Write(readmetaByte)
-	metadata.Sync()
+	writeHandle, _ = os.OpenFile(t.ClientConn.ClientPath+"metadata.dfs", os.O_WRONLY, os.ModePerm)
+	defer writeHandle.Close()
+	_, err = writeHandle.Write(readmetaByte)
+	if err != nil {
+		log.Println(err)
+	}
+	writeHandle.Sync()
 
 	// Write to Server
 	writeChunkMessage = &sharedData.WriteChunkMessage{
@@ -126,24 +131,22 @@ func (t File) Write(chunkNum uint8, chunk *Chunk) error {
 	}
 	t.ChunkVersions[chunkNum] = resChunkMessage.ChunkVersion
 
-	// Get rid of log entry TODO: Clean up, its deleting and remaking, find a way to overwrite
-	metadata2, err := os.OpenFile(t.ClientConn.ClientPath+"metadata.dfs", os.O_WRONLY, os.ModePerm)
+	//Get rid of log entry TODO: Clean up, its deleting and remaking, find a way to overwrite
+	metadata, err = os.Open(t.ClientConn.ClientPath + "metadata.dfs")
+	defer metadata.Close()
 	if err != nil {
 		log.Println(err)
 	}
-	data, _ = ioutil.ReadAll(metadata2)
+	data, _ = ioutil.ReadAll(metadata)
 	json.Unmarshal(data, &readmeta)
-	metadata.Close()
-	os.Remove(t.ClientConn.ClientPath + "metadata.dfs")
 
-	log.Println(readmeta)
-	metadata, err = os.Create(t.ClientConn.ClientPath + "metadata.dfs")
-	defer metadata.Close()
+	writeHandle, _ = os.Create(t.ClientConn.ClientPath + "metadata.dfs")
+	defer writeHandle.Close()
 	delete(readmeta.WriteLogs, t.FName)
 
 	readmetaByte, _ = json.MarshalIndent(readmeta, "", " ")
-	metadata.Write(readmetaByte)
-	metadata.Sync()
+	writeHandle.Write(readmetaByte)
+	writeHandle.Sync()
 
 	return nil
 }
