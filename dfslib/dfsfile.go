@@ -26,7 +26,17 @@ func (t File) Read(chunkNum uint8, chunk *Chunk) error {
 	// 		Check if there is a write, block until the write is done
 	// 		After done, check if current version is latest chunk version
 	//
+	writeChunkMessage := &sharedData.WriteChunkMessage{
+		FName:        t.FName,
+		ChunkIndex:   int(chunkNum),
+		ChunkVersion: t.ChunkVersions[chunkNum],
+		ChunkByte:    t.FileChunks[chunkNum],
+		ClientID:     t.ClientConn.ClientID,
+	}
+	var resChunk [32]byte
+	t.ClientConn.ServerRPC.Call("ClientToServer.GetReadChunk", writeChunkMessage, &resChunk)
 
+	*chunk = resChunk
 	return nil
 }
 func (t File) Write(chunkNum uint8, chunk *Chunk) error {
@@ -72,31 +82,33 @@ func (t File) Write(chunkNum uint8, chunk *Chunk) error {
 	}
 
 	//Write Locally
-	file, err := os.Open(t.ClientConn.ClientPath + t.FName + ".dfs")
+	localFileRead, err := os.Open(t.ClientConn.ClientPath + t.FName + ".dfs")
+	defer localFileRead.Close()
 	if err != nil {
 		log.Println(err)
 	}
-	data, _ := ioutil.ReadAll(file)
+	data, _ := ioutil.ReadAll(localFileRead)
 	var fileChunks [256]Chunk
 	json.Unmarshal(data, &fileChunks)
-
 	fileChunks[chunkNum] = *chunk
+
 	fileBytes, _ := json.Marshal(fileChunks)
-	writeHandle, err := os.OpenFile(t.ClientConn.ClientPath+t.FName+".dfs", os.O_WRONLY, os.ModePerm)
-	defer writeHandle.Close()
-	_, err = writeHandle.Write(fileBytes)
+
+	localFileWrite, err := os.OpenFile(t.ClientConn.ClientPath+t.FName+".dfs", os.O_WRONLY, os.ModePerm)
+	defer localFileWrite.Close()
+	_, err = localFileWrite.Write(fileBytes)
 	if err != nil {
 		log.Println(err)
 	}
-	writeHandle.Sync()
+	localFileWrite.Sync()
 
 	// Write Log
-	metadata, err := os.Open(t.ClientConn.ClientPath + "metadata.dfs")
-	defer metadata.Close()
+	localLogRead, err := os.Open(t.ClientConn.ClientPath + "metadata.dfs")
+	defer localLogRead.Close()
 	if err != nil {
 		log.Println(err)
 	}
-	data, _ = ioutil.ReadAll(metadata)
+	data, _ = ioutil.ReadAll(localLogRead)
 
 	var readmeta ClientMetaData
 	json.Unmarshal(data, &readmeta)
@@ -107,13 +119,13 @@ func (t File) Write(chunkNum uint8, chunk *Chunk) error {
 	readmeta.WriteLogs[t.FName] = t.ChunkVersions[chunkNum] + 1
 
 	readmetaByte, _ := json.MarshalIndent(readmeta, "", " ")
-	writeHandle, _ = os.OpenFile(t.ClientConn.ClientPath+"metadata.dfs", os.O_WRONLY, os.ModePerm)
-	defer writeHandle.Close()
-	_, err = writeHandle.Write(readmetaByte)
+	localLogWrite, _ := os.OpenFile(t.ClientConn.ClientPath+"metadata.dfs", os.O_WRONLY, os.ModePerm)
+	defer localLogWrite.Close()
+	_, err = localLogWrite.Write(readmetaByte)
 	if err != nil {
 		log.Println(err)
 	}
-	writeHandle.Sync()
+	localLogWrite.Sync()
 
 	// Write to Server
 	writeChunkMessage = &sharedData.WriteChunkMessage{
@@ -123,6 +135,7 @@ func (t File) Write(chunkNum uint8, chunk *Chunk) error {
 		ChunkByte:    *chunk,
 		ClientID:     t.ClientConn.ClientID,
 	}
+	log.Println("Chunk Version: ", t.ChunkVersions[chunkNum])
 	var resChunkMessage sharedData.WriteChunkMessage
 	t.ClientConn.ServerRPC.Call("ClientToServer.WriteChunk", writeChunkMessage, &resChunkMessage)
 
@@ -132,21 +145,17 @@ func (t File) Write(chunkNum uint8, chunk *Chunk) error {
 	t.ChunkVersions[chunkNum] = resChunkMessage.ChunkVersion
 
 	//Get rid of log entry TODO: Clean up, its deleting and remaking, find a way to overwrite
-	metadata, err = os.Open(t.ClientConn.ClientPath + "metadata.dfs")
-	defer metadata.Close()
+	localLogReadDelete, err := os.Open(t.ClientConn.ClientPath + "metadata.dfs")
+	defer localLogReadDelete.Close()
 	if err != nil {
 		log.Println(err)
 	}
-	data, _ = ioutil.ReadAll(metadata)
+	data, _ = ioutil.ReadAll(localLogReadDelete)
 	json.Unmarshal(data, &readmeta)
 
-	writeHandle, _ = os.Create(t.ClientConn.ClientPath + "metadata.dfs")
-	defer writeHandle.Close()
+	localLogWriteDelete, _ := os.Create(t.ClientConn.ClientPath + "metadata.dfs")
+	defer localLogWriteDelete.Close()
 	delete(readmeta.WriteLogs, t.FName)
-
-	readmetaByte, _ = json.MarshalIndent(readmeta, "", " ")
-	writeHandle.Write(readmetaByte)
-	writeHandle.Sync()
 
 	return nil
 }

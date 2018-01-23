@@ -87,7 +87,6 @@ func (t *ConnDFS) Open(fname string, mode FileMode) (f DFSFile, err error) {
 					defer file.Close()
 
 					fileBytes, _ := json.Marshal(argFile.FileChunks)
-					log.Println(t.ClientPath + fname + ".dfs")
 					file.Write(fileBytes)
 					file.Sync()
 
@@ -100,6 +99,7 @@ func (t *ConnDFS) Open(fname string, mode FileMode) (f DFSFile, err error) {
 
 					dfsFile.FName = fname
 					dfsFile.FileChunks = testChunk
+					dfsFile.ChunkVersions = argFile.ChunkVersions
 
 					var versionEntries [256]int
 					for i := 0; i < len(versionEntries); i++ {

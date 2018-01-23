@@ -282,6 +282,9 @@ func MountDFS(serverAddr string, localIP string, localPath string) (dfs DFS, err
 		connDFS.ServerRPC.Call("ClientToServer.MapAliveClient", storedDFS, &totalClients)
 
 		//TODO: Start Heartbeats to Client
+		//Steps:
+		//		Create another go routine to listen for UDP packets
+		//		stored heartbeat port to MapAliveClient
 	}
 
 	return connDFS, nil

@@ -31,6 +31,8 @@ func (t *ClientToServer) GetNewCID(localPath string, cid *int) error {
 // Puts active clients in metadata and stores information
 func (t *ClientToServer) MapAliveClient(storedDFSMsg sharedData.StoredDFSMessage, total *int) error {
 	log.Println("MapAliveClient")
+	// TODO:
+	//		Start go routine to call client UDP
 	storedDFS := &sharedData.StoredDFS{ClientID: storedDFSMsg.ClientID, ClientIP: storedDFSMsg.ClientIP, ClientPath: storedDFSMsg.ClientPath}
 	conn, err := net.Dial("tcp", storedDFS.ClientIP)
 	if err != nil {
@@ -54,16 +56,14 @@ func (t *ClientToServer) RetrieveLatestFile(fname string, argFile *sharedData.Ar
 	tempDFSFile := sharedData.ArgFile{FName: fname}
 	chunkMap := metadata.FileMap[fname]
 
+	// Map CID and File
 	tempClientFile := make(map[int][256][32]byte)
-
-	log.Println(chunkMap)
-	log.Println(metadata.ActiveClientMap)
 
 	// Get the latest version of each Chunk
 	for chunkIndex, versionMap := range chunkMap {
 		highestV := -1
 		for cid, v := range versionMap {
-			if _, present := metadata.ActiveClientMap[cid]; present && v >= highestV {
+			if _, present := metadata.ActiveClientMap[cid]; present && v > highestV {
 				// client with latest chunk is present
 				highestV = v
 				chunks, exists := tempClientFile[cid]
@@ -82,8 +82,7 @@ func (t *ClientToServer) RetrieveLatestFile(fname string, argFile *sharedData.Ar
 					//fmt.Println("Chunk Index: ", chunkIndex)
 
 					var clientFile []byte
-					var errOrTime bool
-					client.ClientRPC.Call("ServerToClient.GetFile", fileMessage, &clientFile)
+					err := client.ClientRPC.Call("ServerToClient.GetFile", fileMessage, &clientFile)
 
 					// TIMEOUT function, might need for later: TODO
 					// c := make(chan error, 1)
@@ -100,19 +99,31 @@ func (t *ClientToServer) RetrieveLatestFile(fname string, argFile *sharedData.Ar
 					// 	errOrTime = true
 					// 	fmt.Println("Timed out")
 					// }
-					if !errOrTime {
+					if err == nil {
+
+						// SUPER HACKY, I'm getting an extra "]" in the file sometimes... TODO: Clean this up
+						var bytecount int
+						for i := len(clientFile) - 3; i < len(clientFile); i++ {
+							if clientFile[i] == 93 {
+								bytecount++
+							}
+						}
+						if bytecount > 2 {
+							clientFile = clientFile[:len(clientFile)-(bytecount-2)]
+						}
+
 						var fileChunks [256][32]byte
 						json.Unmarshal(clientFile, &fileChunks)
 						tempClientFile[cid] = fileChunks
 						tempDFSFile.FileChunks[chunkIndex] = fileChunks[chunkIndex]
 						tempDFSFile.ChunkVersions[chunkIndex] = v
+					} else {
+						log.Println(err)
 					}
 				}
 			}
 		}
 	}
-	// log.Println(tempDFSFile.FileChunks)
-	log.Println(tempDFSFile)
 	*argFile = tempDFSFile
 	return nil
 }
@@ -161,7 +172,6 @@ func (t *ClientToServer) CheckWriterExistsAndAdd(writerAndFile sharedData.Writer
 func (t *ClientToServer) WriteChunk(writeChunkMessage sharedData.WriteChunkMessage, resChunkMessage *sharedData.WriteChunkMessage) error {
 	log.Println("WriteChunk")
 	metadata.FileMap[writeChunkMessage.FName][writeChunkMessage.ChunkIndex][writeChunkMessage.ClientID] = writeChunkMessage.ChunkVersion + 1
-
 	*resChunkMessage = sharedData.WriteChunkMessage{
 		FName:        writeChunkMessage.FName,
 		ChunkIndex:   writeChunkMessage.ChunkIndex,
@@ -205,6 +215,52 @@ func (t *ClientToServer) BlockChunk(chunkMessage sharedData.WriteChunkMessage, c
 		*canWrite = true
 	} else {
 		*canWrite = false
+	}
+	return nil
+}
+
+//Lock chunk for a write
+func (t *ClientToServer) GetReadChunk(chunkMessage sharedData.WriteChunkMessage, resChunk *[32]byte) error {
+	log.Println("GetReadChunk")
+	_, exists := metadata.ActiveWriteChunks[chunkMessage.FName][chunkMessage.ChunkIndex]
+	tempDFSFile := sharedData.ArgFile{FName: chunkMessage.FName}
+	highestV := -1
+	if exists {
+		// Wait for lock to release
+	} else {
+		chunkVersion := chunkMessage.ChunkVersion
+		for cid, v := range metadata.FileMap[chunkMessage.FName][chunkMessage.ChunkIndex] {
+			if v > highestV {
+				highestV = v
+			}
+			_, isActive := metadata.ActiveClientMap[cid]
+			if v > chunkVersion && isActive {
+				client := metadata.ClientMap[cid]
+				var fileMessage sharedData.GetFileMessage
+				fileMessage.Fname = chunkMessage.FName
+				fileMessage.ChunkIndex = chunkMessage.ChunkIndex
+				fileMessage.ClientID = cid
+				fileMessage.ClientPath = client.ClientPath
+
+				//fmt.Println("Calling client: ", cid, "with IP: ", client.ClientIP)
+				//fmt.Println("Chunk Index: ", chunkIndex)
+
+				var clientFile []byte
+				err := client.ClientRPC.Call("ServerToClient.GetFile", fileMessage, &clientFile)
+				if err == nil {
+					var fileChunks [256][32]byte
+					json.Unmarshal(clientFile, &fileChunks)
+					tempDFSFile.FileChunks[chunkMessage.ChunkIndex] = fileChunks[chunkMessage.ChunkIndex]
+					tempDFSFile.ChunkVersions[chunkMessage.ChunkIndex] = v
+					*resChunk = fileChunks[chunkMessage.ChunkIndex]
+				} else {
+					log.Println(err)
+				}
+			}
+		}
+	}
+	if highestV <= chunkMessage.ChunkVersion {
+		*resChunk = chunkMessage.ChunkByte
 	}
 	return nil
 }

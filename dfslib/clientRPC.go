@@ -18,8 +18,21 @@ func (t *ServerToClient) CheckLocalStorage(fileName string, retBool *bool) error
 }
 func (t *ServerToClient) GetFile(fileChunkMsg sharedData.GetFileMessage, chunk *[]byte) error {
 	log.Println("GetFileChunk, Chunk Index: ", fileChunkMsg.ChunkIndex)
-	file, _ := os.Open(fileChunkMsg.ClientPath + fileChunkMsg.Fname + ".dfs")
-	data, _ := ioutil.ReadAll(file)
+	localFileRead, err := os.Open(fileChunkMsg.ClientPath + fileChunkMsg.Fname + ".dfs")
+	defer localFileRead.Close()
+	if err != nil {
+		log.Println(err)
+	}
+	data, _ := ioutil.ReadAll(localFileRead)
+
 	*chunk = data
+	// file, _ := os.Open(fileChunkMsg.ClientPath + fileChunkMsg.Fname + ".dfs")
+	// data, _ := ioutil.ReadAll(file)
+	// *chunk = data
+
+	// var fileChunks [256][32]byte
+	// json.Unmarshal(data, &fileChunks)
+	// log.Println(fileChunks[0])
+
 	return nil
 }
