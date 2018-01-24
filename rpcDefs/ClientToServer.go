@@ -2,7 +2,6 @@ package rpcDefs
 
 import (
 	"encoding/json"
-	"fmt"
 	"log"
 	"net"
 	"net/rpc"
@@ -59,12 +58,16 @@ func (t *ClientToServer) RetrieveLatestFile(fname string, argFile *sharedData.Ar
 	// Map CID and File
 	tempClientFile := make(map[int][256][32]byte)
 
+	//Flag for trivial version
+	isTrivial := true
+
 	// Get the latest version of each Chunk
 	for chunkIndex, versionMap := range chunkMap {
 		highestV := -1
 		for cid, v := range versionMap {
 			if _, present := metadata.ActiveClientMap[cid]; present && v > highestV {
 				// client with latest chunk is present
+
 				highestV = v
 				chunks, exists := tempClientFile[cid]
 				if exists {
@@ -100,6 +103,9 @@ func (t *ClientToServer) RetrieveLatestFile(fname string, argFile *sharedData.Ar
 					// 	fmt.Println("Timed out")
 					// }
 					if err == nil {
+						if v > 0 {
+							isTrivial = false
+						}
 
 						// SUPER HACKY, I'm getting an extra "]" in the file sometimes... TODO: Clean this up
 						var bytecount int
@@ -124,7 +130,10 @@ func (t *ClientToServer) RetrieveLatestFile(fname string, argFile *sharedData.Ar
 			}
 		}
 	}
-	*argFile = tempDFSFile
+
+	if !isTrivial {
+		*argFile = tempDFSFile
+	}
 	return nil
 }
 
@@ -162,7 +171,6 @@ func (t *ClientToServer) CheckWriterExistsAndAdd(writerAndFile sharedData.Writer
 	if !exists {
 		// Add writer to ActiveFiles
 		metadata.ActiveFiles[writerAndFile.Fname] = writerAndFile.ClientID
-		fmt.Println(metadata.ActiveFiles)
 	}
 	*writerExists = exists
 	return nil
@@ -200,7 +208,7 @@ func (t *ClientToServer) SyncHeartBeat(storedDFSMessage sharedData.StoredDFSMess
 //Lock chunk for a write
 func (t *ClientToServer) BlockChunk(chunkMessage sharedData.WriteChunkMessage, canWrite *bool) error {
 	log.Println("BlockChunk")
-
+	// TODO, check if there is read on that block, block until done read
 	_, exists := metadata.ActiveClientMap[chunkMessage.ClientID] // Check if connected
 	_, hasLock := metadata.ActiveFiles[chunkMessage.FName]       // Check if it has lock on file to write
 	if exists && hasLock {

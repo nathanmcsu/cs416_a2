@@ -78,7 +78,11 @@ func (t *ConnDFS) Open(fname string, mode FileMode) (f DFSFile, err error) {
 				// Retrieve file from server call
 				var argFile sharedData.ArgFile
 				err = t.ServerRPC.Call("ClientToServer.RetrieveLatestFile", fname, &argFile)
-				// log.Println(argFile)
+
+				if len(argFile.FName) == 0 {
+					return nil, FileUnavailableError(fname)
+				}
+
 				if err != nil {
 					log.Println(err)
 				} else {
@@ -182,12 +186,15 @@ func (t *ConnDFS) UMountDFS() error {
 		ClientPath: t.ClientPath,
 	}
 
-	err := t.ServerRPC.Call("ClientToServer.SyncHeartBeat", storedDFSMessage, &isConnected)
+	if !t.IsOffline {
 
-	if err != nil || !isConnected {
-		return DisconnectedError(t.ServerIP)
+		err := t.ServerRPC.Call("ClientToServer.SyncHeartBeat", storedDFSMessage, &isConnected)
+
+		if err != nil || !isConnected {
+			return DisconnectedError(t.ServerIP)
+		}
+		var isOk bool
+		t.ServerRPC.Call("ClientToServer.CloseConnection", t.ClientID, &isOk)
 	}
-	var isOk bool
-	t.ServerRPC.Call("ClientToServer.CloseConnection", t.ClientID, &isOk)
 	return nil
 }

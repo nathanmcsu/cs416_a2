@@ -18,6 +18,7 @@ type File struct {
 }
 
 func (t File) Read(chunkNum uint8, chunk *Chunk) error {
+	log.Println("READ")
 	// Check if Read mode or dread mode
 	//		if dread, return chunk
 	//	if read:
@@ -26,17 +27,21 @@ func (t File) Read(chunkNum uint8, chunk *Chunk) error {
 	// 		Check if there is a write, block until the write is done
 	// 		After done, check if current version is latest chunk version
 	//
-	writeChunkMessage := &sharedData.WriteChunkMessage{
-		FName:        t.FName,
-		ChunkIndex:   int(chunkNum),
-		ChunkVersion: t.ChunkVersions[chunkNum],
-		ChunkByte:    t.FileChunks[chunkNum],
-		ClientID:     t.ClientConn.ClientID,
-	}
-	var resChunk [32]byte
-	t.ClientConn.ServerRPC.Call("ClientToServer.GetReadChunk", writeChunkMessage, &resChunk)
+	if t.Mode == DREAD {
+		*chunk = t.FileChunks[chunkNum]
+	} else {
+		writeChunkMessage := &sharedData.WriteChunkMessage{
+			FName:        t.FName,
+			ChunkIndex:   int(chunkNum),
+			ChunkVersion: t.ChunkVersions[chunkNum],
+			ChunkByte:    t.FileChunks[chunkNum],
+			ClientID:     t.ClientConn.ClientID,
+		}
+		var resChunk [32]byte
+		t.ClientConn.ServerRPC.Call("ClientToServer.GetReadChunk", writeChunkMessage, &resChunk)
 
-	*chunk = resChunk
+		*chunk = resChunk
+	}
 	return nil
 }
 func (t File) Write(chunkNum uint8, chunk *Chunk) error {
@@ -135,7 +140,6 @@ func (t File) Write(chunkNum uint8, chunk *Chunk) error {
 		ChunkByte:    *chunk,
 		ClientID:     t.ClientConn.ClientID,
 	}
-	log.Println("Chunk Version: ", t.ChunkVersions[chunkNum])
 	var resChunkMessage sharedData.WriteChunkMessage
 	t.ClientConn.ServerRPC.Call("ClientToServer.WriteChunk", writeChunkMessage, &resChunkMessage)
 

@@ -35,40 +35,26 @@ func main() {
 	defer dfs.UMountDFS()
 
 	// Check if hello.txt file exists in the global DFS.
-	exists, err := dfs.GlobalFileExists("helloworld")
+	_, err = dfs.GlobalFileExists("helloworld")
 	if checkError(err) != nil {
 		// return
 	}
 
-	if exists {
-		fmt.Println("File already exists, mission accomplished")
-		// return
-	}
-
-	// Open the file (and create it if it does not exist) for writing.
-	f, err := dfs.Open("helloworld", dfslib.WRITE)
+	f, err := dfs.Open("helloworld", dfslib.DREAD)
 	if checkError(err) != nil {
 		return
 	}
+	// Write the 0th chunk of the file.
 
-	// Create a chunk with a string message.
-	// var chunk dfslib.Chunk
-	// const str = "Friends Hello!"
-	// copy(chunk[:], str)
-
-	// // Write the 0th chunk of the file.
-	// err = f.Write(2, &chunk)
-	// if checkError(err) != nil {
-	// 	return
-	// }
-	// // Close the file on exit.
-	f.Close()
-	// for true {
-
-	// }
-	// // Read the 0th chunk of the file.
-	// err = f.Read(0, &chunk)
-	// checkError(err)
+	var chunk dfslib.Chunk
+	err = f.Read(0, &chunk)
+	checkError(err)
+	fmt.Println("Chunk: ", chunk)
+	err = f.Write(0, &chunk)
+	if checkError(err) != nil {
+		return
+	}
+	return
 
 }
 
