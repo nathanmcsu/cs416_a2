@@ -73,6 +73,9 @@ func (t *ClientToServer) RetrieveLatestFile(fname string, argFile *sharedData.Ar
 				if exists {
 					tempDFSFile.FileChunks[chunkIndex] = chunks[chunkIndex]
 					tempDFSFile.ChunkVersions[chunkIndex] = v
+					if v > 0 {
+						isTrivial = false
+					}
 				} else {
 					client := metadata.ClientMap[cid]
 					var fileMessage sharedData.GetFileMessage

@@ -14,6 +14,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"./dfslib"
 )
@@ -63,13 +64,20 @@ func main() {
 	}
 	// Close the file on exit.
 	f.Close()
-	for true {
-
+	ok := true
+	for ok {
+		time.Sleep(5 * time.Second)
+		ok = false
 	}
 	// Read the 0th chunk of the file.
-	err = f.Read(0, &chunk)
+	file2, err := dfs.Open("helloworld", dfslib.WRITE)
+	if checkError(err) != nil {
+		return
+	}
+	err = file2.Read(0, &chunk)
+	fmt.Println(chunk)
 	checkError(err)
-
+	file2.Close()
 }
 
 // If error is non-nil, print it out and return it.
