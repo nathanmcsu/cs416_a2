@@ -35,6 +35,7 @@ func main() {
 	metadata.ActiveFiles = make(map[string]int)
 	metadata.ActiveWriteChunks = make(map[string]map[int]int)
 	metadata.ActiveClientMap = make(map[int]bool)
+	metadata.ServerIP = localPort
 	server.Accept(tcpConn)
 
 }

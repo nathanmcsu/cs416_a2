@@ -12,13 +12,14 @@ import (
 )
 
 type ConnDFS struct {
-	ServerRPC  *rpc.Client
-	ClientRPC  *rpc.Client
-	IsOffline  bool
-	ClientID   int
-	ClientPath string
-	ServerIP   string
-	ClientIP   string
+	ServerRPC   *rpc.Client
+	ClientRPC   *rpc.Client
+	IsOffline   bool
+	ClientID    int
+	ClientPath  string
+	ServerIP    string
+	ClientIP    string
+	ClientUDPIP string
 }
 
 func (t *ConnDFS) LocalFileExists(fname string) (exists bool, err error) {
@@ -195,6 +196,9 @@ func (t *ConnDFS) UMountDFS() error {
 		}
 		var isOk bool
 		t.ServerRPC.Call("ClientToServer.CloseConnection", t.ClientID, &isOk)
+
+		ClientConnData.rpcConn.Close()
+		// ClientConnData.udpConn.Close()
 	}
 	return nil
 }

@@ -5,12 +5,45 @@ import (
 	"log"
 	"net"
 	"net/rpc"
+	"time"
 
 	"../metadata"
 	"../sharedData"
 )
 
 // Client to Server RPC
+
+func startHeartBeats(storedDFSMsg sharedData.StoredDFSMessage) {
+	log.Println("startHeartBeats on: ", storedDFSMsg.ClientUDPIP)
+	log.Println("Client UDP IP: ", storedDFSMsg.ClientUDPIP)
+	udpAddr, _ := net.ResolveUDPAddr("udp", metadata.ServerIP)
+	conn, _ := net.ListenUDP("udp", udpAddr)
+	defer conn.Close()
+	isAlive := true
+	for isAlive {
+		isAlive = heartBeat(storedDFSMsg.ClientUDPIP, conn)
+		time.Sleep(500 * time.Millisecond)
+	}
+	log.Println("Client is dead")
+}
+
+func heartBeat(clientIP string, conn *net.UDPConn) bool {
+	log.Println("heartBeat")
+	clientUDP, _ := net.ResolveUDPAddr("udp", clientIP)
+	_, err := conn.WriteToUDP([]byte("are you alive?"), clientUDP)
+	if err != nil {
+		log.Println(err)
+		return false
+	}
+	buffer := make([]byte, 1024)
+	conn.SetReadDeadline(time.Now().Add(2 * time.Second))
+	_, err = conn.Read(buffer)
+	if err != nil {
+		log.Println(err)
+		return false
+	}
+	return true
+}
 
 type ClientToServer rpc.Client
 
@@ -46,6 +79,9 @@ func (t *ClientToServer) MapAliveClient(storedDFSMsg sharedData.StoredDFSMessage
 	metadata.ActiveClientMap[storedDFS.ClientID] = true
 
 	*total = size
+
+	go startHeartBeats(storedDFSMsg)
+
 	return nil
 }
 

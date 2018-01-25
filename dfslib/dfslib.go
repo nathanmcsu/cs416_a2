@@ -28,8 +28,11 @@ type ClientMetaData struct {
 }
 
 type ClientConnectionData struct {
-	connDFS ConnDFS
+	rpcConn *net.TCPListener
+	udpIP   string
 }
+
+var ClientConnData ClientConnectionData
 
 // A Chunk is the unit of reading/writing in DFS.
 type Chunk [32]byte
@@ -70,7 +73,7 @@ func (e DisconnectedError) Error() string {
 type ChunkUnavailableError uint8
 
 func (e ChunkUnavailableError) Error() string {
-	return fmt.Sprintf("DFS: Latest verson of chunk [%s] unavailable", string(e))
+	return fmt.Sprintf("DFS: Latest verson of chunk [%d] unavailable", string(e))
 }
 
 // Contains filename
@@ -247,19 +250,24 @@ func MountDFS(serverAddr string, localIP string, localPath string) (dfs DFS, err
 	if !isOffline {
 		// Establish Server -> Client RPC
 		clientIP := localIP + ":0"
-		clientAddr, err := net.ResolveTCPAddr("tcp", clientIP)
+		clientTCPaddr, err := net.ResolveTCPAddr("tcp", clientIP)
 		if err != nil {
 			log.Println(err)
 		}
-		tcpConn, err := net.ListenTCP("tcp", clientAddr)
+		tcpConn, err := net.ListenTCP("tcp", clientTCPaddr)
 		if err != nil {
 			log.Println(err)
 		}
-		clientIP = localIP + ":" + strconv.Itoa(tcpConn.Addr().(*net.TCPAddr).Port)
-		log.Println("Client RCP IP: ", clientIP)
+		clientTCPIP := localIP + ":" + strconv.Itoa(tcpConn.Addr().(*net.TCPAddr).Port)
+
+		go createUDPServer(clientIP)
+
+		log.Println("Client RCP IP: ", clientTCPIP)
 		clientServer := rpc.NewServer()
 		serverToClient := new(ServerToClient)
 		clientServer.Register(serverToClient)
+
+		ClientConnData.rpcConn = tcpConn
 
 		go clientServer.Accept(tcpConn)
 
@@ -269,15 +277,30 @@ func MountDFS(serverAddr string, localIP string, localPath string) (dfs DFS, err
 		// 	fmt.Println(err)
 		// }
 
-		clientConn, err := net.Dial("tcp", clientIP)
+		clientConn, err := net.Dial("tcp", clientTCPIP)
 		if err != nil {
 			log.Println(err)
 		}
+		defer clientConn.Close()
+		// udptestConn, err := net.Dial("udp", ClientConnData.udpIP)
+		// if err != nil {
+		// 	log.Println(err)
+		// }
+		// defer udptestConn.Close()
+
+		// // TEST
+		// _, err = udptestConn.Write([]byte("are you alive?"))
+		// if err != nil {
+		// 	log.Println(err)
+
+		// }
+
 		connDFS.ClientRPC = rpc.NewClient(clientConn)
 		var totalClients int
 
-		storedDFS := &sharedData.StoredDFSMessage{ClientID: connDFS.ClientID, ClientIP: clientIP, ClientPath: localPath}
-		connDFS.ClientIP = clientIP
+		storedDFS := &sharedData.StoredDFSMessage{ClientID: connDFS.ClientID, ClientIP: clientTCPIP, ClientPath: localPath, ClientUDPIP: ClientConnData.udpIP}
+		connDFS.ClientIP = clientTCPIP
+		connDFS.ClientUDPIP = ClientConnData.udpIP
 
 		connDFS.ServerRPC.Call("ClientToServer.MapAliveClient", storedDFS, &totalClients)
 
@@ -288,4 +311,26 @@ func MountDFS(serverAddr string, localIP string, localPath string) (dfs DFS, err
 	}
 
 	return connDFS, nil
+}
+
+func createUDPServer(ipaddr string) {
+	clientUDPaddr, err := net.ResolveUDPAddr("udp", ipaddr)
+	if err != nil {
+		log.Println(err)
+	}
+
+	udpConn, _ := net.ListenUDP("udp", clientUDPaddr)
+
+	clientUDPIP := udpConn.LocalAddr().String()
+	ClientConnData.udpIP = clientUDPIP
+	buf := make([]byte, 1024)
+
+	for {
+		_, addr, err := udpConn.ReadFromUDP(buf)
+		if err == nil {
+			log.Println(addr)
+			udpConn.WriteToUDP([]byte("I am alive "), addr)
+		}
+	}
+	log.Println("Client UDP IP: ", clientUDPIP)
 }

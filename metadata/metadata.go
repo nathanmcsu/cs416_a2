@@ -18,3 +18,6 @@ var ActiveClientMap map[int]bool
 
 // CID and information
 var ClientMap map[int]sharedData.StoredDFS
+
+// Server Addr information
+var ServerIP string

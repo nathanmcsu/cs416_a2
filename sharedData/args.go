@@ -3,9 +3,10 @@ package sharedData
 import "net/rpc"
 
 type StoredDFSMessage struct {
-	ClientIP   string
-	ClientID   int
-	ClientPath string
+	ClientIP    string
+	ClientID    int
+	ClientPath  string
+	ClientUDPIP string
 }
 type StoredDFS struct {
 	ClientIP   string
