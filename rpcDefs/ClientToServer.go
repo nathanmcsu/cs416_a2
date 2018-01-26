@@ -309,35 +309,41 @@ func (t *ClientToServer) GetReadChunk(chunkMessage sharedData.WriteChunkMessage,
 	highestV := -1
 	if exists {
 		// Wait for lock to release
-	} else {
-		chunkVersion := chunkMessage.ChunkVersion
-		for cid, v := range metadata.FileMap[chunkMessage.FName][chunkMessage.ChunkIndex] {
-			if v > highestV {
-				highestV = v
+		for {
+			time.Sleep(time.Second)
+			_, exists = metadata.ActiveWriteChunks[chunkMessage.FName][chunkMessage.ChunkIndex]
+			if !exists {
+				break
 			}
-			_, isActive := metadata.ActiveClientMap[cid]
-			if v > chunkVersion && isActive {
-				client := metadata.ClientMap[cid]
-				var fileMessage sharedData.GetFileMessage
-				fileMessage.Fname = chunkMessage.FName
-				fileMessage.ChunkIndex = chunkMessage.ChunkIndex
-				fileMessage.ClientID = cid
-				fileMessage.ClientPath = client.ClientPath
+		}
+	}
+	chunkVersion := chunkMessage.ChunkVersion
+	for cid, v := range metadata.FileMap[chunkMessage.FName][chunkMessage.ChunkIndex] {
+		if v > highestV {
+			highestV = v
+		}
+		_, isActive := metadata.ActiveClientMap[cid]
+		if v > chunkVersion && isActive {
+			client := metadata.ClientMap[cid]
+			var fileMessage sharedData.GetFileMessage
+			fileMessage.Fname = chunkMessage.FName
+			fileMessage.ChunkIndex = chunkMessage.ChunkIndex
+			fileMessage.ClientID = cid
+			fileMessage.ClientPath = client.ClientPath
 
-				//fmt.Println("Calling client: ", cid, "with IP: ", client.ClientIP)
-				//fmt.Println("Chunk Index: ", chunkIndex)
+			//fmt.Println("Calling client: ", cid, "with IP: ", client.ClientIP)
+			//fmt.Println("Chunk Index: ", chunkIndex)
 
-				var clientFile []byte
-				err := client.ClientRPC.Call("ServerToClient.GetFile", fileMessage, &clientFile)
-				if err == nil {
-					var fileChunks [256][32]byte
-					json.Unmarshal(clientFile, &fileChunks)
-					tempDFSFile.FileChunks[chunkMessage.ChunkIndex] = fileChunks[chunkMessage.ChunkIndex]
-					tempDFSFile.ChunkVersions[chunkMessage.ChunkIndex] = v
-					*resChunk = fileChunks[chunkMessage.ChunkIndex]
-				} else {
-					log.Println(err)
-				}
+			var clientFile []byte
+			err := client.ClientRPC.Call("ServerToClient.GetFile", fileMessage, &clientFile)
+			if err == nil {
+				var fileChunks [256][32]byte
+				json.Unmarshal(clientFile, &fileChunks)
+				tempDFSFile.FileChunks[chunkMessage.ChunkIndex] = fileChunks[chunkMessage.ChunkIndex]
+				tempDFSFile.ChunkVersions[chunkMessage.ChunkIndex] = v
+				*resChunk = fileChunks[chunkMessage.ChunkIndex]
+			} else {
+				log.Println(err)
 			}
 		}
 	}

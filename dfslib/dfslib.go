@@ -90,6 +90,13 @@ func (e BadFileModeError) Error() string {
 	return fmt.Sprintf("DFS: Cannot perform this operation in current file mode [%s]", string(e))
 }
 
+// Contains filename.
+type WriteModeTimeoutError string
+
+func (e WriteModeTimeoutError) Error() string {
+	return fmt.Sprintf("DFS: Write access to filename [%s] has timed out; reopen the file", string(e))
+}
+
 // Contains filename
 type BadFilenameError string
 
@@ -137,6 +144,7 @@ type DFSFile interface {
 	// Can return the following errors:
 	// - BadFileModeError (in READ,DREAD modes)
 	// - DisconnectedError (in WRITE mode)
+	// - WriteModeTimeoutError (in WRITE mode)
 	Write(chunkNum uint8, chunk *Chunk) (err error)
 
 	// Closes the file/cleans up. Can return the following errors:

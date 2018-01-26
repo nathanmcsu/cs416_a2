@@ -13,6 +13,7 @@ package main
 // this app.go file
 import (
 	"fmt"
+	"log"
 	"os"
 
 	"./dfslib"
@@ -39,6 +40,11 @@ func main() {
 	if checkError(err) != nil {
 		// return
 	}
+	exists, err := dfs.LocalFileExists("helloworld")
+	if checkError(err) != nil {
+		// return
+	}
+	log.Println(exists)
 
 	f, err := dfs.Open("helloworld", dfslib.DREAD)
 	if checkError(err) != nil {

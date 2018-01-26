@@ -83,7 +83,7 @@ func (t File) Write(chunkNum uint8, chunk *Chunk) error {
 	var canWrite bool
 	t.ClientConn.ServerRPC.Call("ClientToServer.BlockChunk", writeChunkMessage, &canWrite)
 	if !canWrite {
-		return DisconnectedError(t.ClientConn.ServerIP)
+		return WriteModeTimeoutError(t.FName)
 	}
 
 	//Write Locally

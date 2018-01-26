@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/rpc"
 	"os"
+	"unicode"
 
 	"../sharedData"
 )
@@ -22,8 +23,29 @@ type ConnDFS struct {
 	ClientUDPIP string
 }
 
+func isValidString(str string) bool {
+	if len(str) > 16 {
+		return false
+	}
+	for _, r := range str {
+		if !unicode.IsLetter(r) {
+			return false
+		}
+	}
+	return true
+
+}
+
 func (t *ConnDFS) LocalFileExists(fname string) (exists bool, err error) {
-	return false, nil
+	if !isValidString(fname) {
+		return false, BadFilenameError(fname)
+	}
+	_, err = os.Open(t.ClientPath + fname + ".dfs")
+	if err != nil {
+		log.Println(err)
+		return false, nil
+	}
+	return true, nil
 }
 
 func (t *ConnDFS) GlobalFileExists(fname string) (exists bool, err error) {
