@@ -14,34 +14,65 @@ import (
 // Client to Server RPC
 
 func startHeartBeats(storedDFSMsg sharedData.StoredDFSMessage) {
-	log.Println("startHeartBeats on: ", storedDFSMsg.ClientUDPIP)
-	log.Println("Client UDP IP: ", storedDFSMsg.ClientUDPIP)
+	//log.Println("startHeartBeats on: ", storedDFSMsg.ClientUDPIP)
 	udpAddr, _ := net.ResolveUDPAddr("udp", metadata.ServerIP)
 	conn, _ := net.ListenUDP("udp", udpAddr)
-	defer conn.Close()
+	log.Println("Server port: ", conn.LocalAddr().String())
 	isAlive := true
 	for isAlive {
 		isAlive = heartBeat(storedDFSMsg.ClientUDPIP, conn)
 		time.Sleep(500 * time.Millisecond)
 	}
+
+	// TODO, close active connections with client
+	CloseConnectionNoRPC(storedDFSMsg.ClientID)
 	log.Println("Client is dead")
 }
 
 func heartBeat(clientIP string, conn *net.UDPConn) bool {
-	log.Println("heartBeat")
+	//log.Println("heartBeat: ", clientIP)
 	clientUDP, _ := net.ResolveUDPAddr("udp", clientIP)
-	_, err := conn.WriteToUDP([]byte("are you alive?"), clientUDP)
-	if err != nil {
-		log.Println(err)
+
+	writeChan := make(chan int, 1)
+	go func() {
+		n, _ := conn.WriteToUDP([]byte("are you alive?"), clientUDP)
+		writeChan <- n
+	}()
+
+	select {
+	case <-writeChan:
+		//log.Println("Write to: ", clientIP)
+	case <-time.After(time.Second * 2):
+		//log.Println("Timeout in Write: ", clientIP)
 		return false
 	}
+
+	// _, err := conn.WriteToUDP([]byte("are you alive?"), clientUDP)
+	// if err != nil {
+	// 	log.Println(err)
+	// 	return false
+	// }
 	buffer := make([]byte, 1024)
-	conn.SetReadDeadline(time.Now().Add(2 * time.Second))
-	_, err = conn.Read(buffer)
-	if err != nil {
-		log.Println(err)
+
+	readChan := make(chan string, 1)
+
+	go func() {
+		_, addr, _ := conn.ReadFromUDP(buffer)
+		readChan <- addr.String()
+	}()
+
+	select {
+	case <-readChan:
+		//log.Println(res)
+	case <-time.After(time.Second * 2):
+		//log.Println("Timeout in Read: ", clientIP)
 		return false
 	}
+	// _, err = conn.Read(buffer)
+	// if err != nil {
+	// 	log.Println(err)
+	// 	return false
+	// }
 	return true
 }
 
@@ -94,13 +125,17 @@ func (t *ClientToServer) RetrieveLatestFile(fname string, argFile *sharedData.Ar
 	// Map CID and File
 	tempClientFile := make(map[int][256][32]byte)
 
-	//Flag for trivial version
-	isTrivial := true
+	//Flags for trivial version
+	isTrivial := true      // if there are versions > 0 but the file is offline
+	noModification := true // if there are no versions > 0
 
 	// Get the latest version of each Chunk
 	for chunkIndex, versionMap := range chunkMap {
 		highestV := -1
 		for cid, v := range versionMap {
+			if v > 0 {
+				noModification = false
+			}
 			if _, present := metadata.ActiveClientMap[cid]; present && v > highestV {
 				// client with latest chunk is present
 
@@ -170,7 +205,7 @@ func (t *ClientToServer) RetrieveLatestFile(fname string, argFile *sharedData.Ar
 		}
 	}
 
-	if !isTrivial {
+	if !isTrivial || noModification {
 		*argFile = tempDFSFile
 	}
 	return nil
@@ -339,6 +374,13 @@ func (t *ClientToServer) CloseFile(writerAndFile sharedData.WriterAndFile, isOk 
 // Removes client from active client list
 func (t *ClientToServer) CloseConnection(clientID int, isOk *bool) error {
 	log.Println("CloseConnection")
+	CloseConnectionNoRPC(clientID)
+	*isOk = true
+	return nil
+}
+
+func CloseConnectionNoRPC(clientID int) {
+	log.Println("CloseConnectionNoRPC")
 	delete(metadata.ActiveClientMap, clientID)
 
 	// There shouldn't be any in Active Write Chunks, but checking just in case:
@@ -357,6 +399,4 @@ func (t *ClientToServer) CloseConnection(clientID int, isOk *bool) error {
 		}
 	}
 
-	*isOk = true
-	return nil
 }

@@ -49,6 +49,9 @@ func main() {
 	err = f.Read(0, &chunk)
 	checkError(err)
 	fmt.Println("Chunk: ", chunk)
+	for {
+
+	}
 	return
 	if exists {
 		fmt.Println("File already exists, mission accomplished")

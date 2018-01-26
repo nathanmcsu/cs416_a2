@@ -328,9 +328,8 @@ func createUDPServer(ipaddr string) {
 	for {
 		_, addr, err := udpConn.ReadFromUDP(buf)
 		if err == nil {
-			log.Println(addr)
 			udpConn.WriteToUDP([]byte("I am alive "), addr)
 		}
 	}
-	log.Println("Client UDP IP: ", clientUDPIP)
+
 }

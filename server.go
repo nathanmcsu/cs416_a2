@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/rpc"
 	"os"
+	"strings"
 
 	"./metadata"
 	"./rpcDefs"
@@ -35,7 +36,10 @@ func main() {
 	metadata.ActiveFiles = make(map[string]int)
 	metadata.ActiveWriteChunks = make(map[string]map[int]int)
 	metadata.ActiveClientMap = make(map[int]bool)
-	metadata.ServerIP = localPort
+
+	index := strings.Index(localPort, ":")
+	metadata.ServerIP = localPort[0:index]
+
 	server.Accept(tcpConn)
 
 }

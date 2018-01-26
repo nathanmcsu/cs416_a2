@@ -56,7 +56,7 @@ func main() {
 	const str = "Friends Hello 1234!"
 	copy(chunk[:], str)
 
-	// Write the 0th chunk of the file.
+	//Write the 0th chunk of the file.
 	err = f.Write(0, &chunk)
 	if checkError(err) != nil {
 		return
