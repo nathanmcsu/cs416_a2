@@ -3,7 +3,7 @@ package dfslib
 import (
 	"encoding/json"
 	"io/ioutil"
-	"log"
+	"net"
 	"os"
 
 	"../sharedData"
@@ -18,15 +18,26 @@ type File struct {
 }
 
 func (t File) Read(chunkNum uint8, chunk *Chunk) error {
-	log.Println("READ")
+	// log.Println("READ")
 	// Check if Read mode or dread mode
 	//		if dread, return chunk
 	//	if read:
 	//
 	// TODO:
-	// 		Check if there is a write, block until the write is done
-	// 		After done, check if current version is latest chunk version
+	//		DisconnectedError(done)
+	// 		Check if there is a write, block until the write is done (done)
+	// 		After done, check if current version is latest chunk version (done)
 	//
+	if t.ClientConn.IsOffline && (t.Mode == WRITE || t.Mode == READ) {
+		// Try to reconnect first, if connected then don't return error
+		_, err := net.Dial("tcp", t.ClientConn.ServerIP)
+		if err == nil {
+			connDFS, _ := MountDFS(t.ClientConn.ServerIP, t.ClientConn.ClientIP, t.ClientConn.ClientPath)
+			t.ClientConn = connDFS.(ConnDFS)
+		} else {
+			return DisconnectedError(t.ClientConn.ServerIP)
+		}
+	}
 	if t.Mode == DREAD {
 		*chunk = t.FileChunks[chunkNum]
 	} else {
@@ -39,18 +50,27 @@ func (t File) Read(chunkNum uint8, chunk *Chunk) error {
 		}
 		var resChunk [32]byte
 		t.ClientConn.ServerRPC.Call("ClientToServer.GetReadChunk", writeChunkMessage, &resChunk)
-
 		*chunk = resChunk
 	}
 	return nil
 }
 func (t File) Write(chunkNum uint8, chunk *Chunk) error {
-	log.Println("Write")
+	// log.Println("Write")
 
 	if t.Mode != WRITE {
 		return BadFileModeError(t.Mode)
 	}
 	// DisconnectedError, check if Server is up
+	if t.ClientConn.IsOffline && (t.Mode == WRITE || t.Mode == READ) {
+		// Try to reconnect first, if connected then don't return error
+		_, err := net.Dial("tcp", t.ClientConn.ServerIP)
+		if err == nil {
+			connDFS, _ := MountDFS(t.ClientConn.ServerIP, t.ClientConn.ClientIP, t.ClientConn.ClientPath)
+			t.ClientConn = connDFS.(ConnDFS)
+		} else {
+			return DisconnectedError(t.ClientConn.ServerIP)
+		}
+	}
 	var isConnected bool
 	storedDFSMessage := &sharedData.StoredDFSMessage{
 		ClientIP:   t.ClientConn.ClientIP,
@@ -65,7 +85,7 @@ func (t File) Write(chunkNum uint8, chunk *Chunk) error {
 	}
 
 	// Steps:
-	//		-Tell server you are writing, to block any reads  TODO
+	//		-Tell server you are writing, to block any reads
 	// 		-Write locally first
 	//		-Write to Log File
 	//			-Write to Server
@@ -90,7 +110,7 @@ func (t File) Write(chunkNum uint8, chunk *Chunk) error {
 	localFileRead, err := os.Open(t.ClientConn.ClientPath + t.FName + ".dfs")
 	defer localFileRead.Close()
 	if err != nil {
-		log.Println(err)
+		//log.Println(err)
 	}
 	data, _ := ioutil.ReadAll(localFileRead)
 	var fileChunks [256]Chunk
@@ -103,7 +123,7 @@ func (t File) Write(chunkNum uint8, chunk *Chunk) error {
 	defer localFileWrite.Close()
 	_, err = localFileWrite.Write(fileBytes)
 	if err != nil {
-		log.Println(err)
+		//log.Println(err)
 	}
 	localFileWrite.Sync()
 
@@ -111,7 +131,7 @@ func (t File) Write(chunkNum uint8, chunk *Chunk) error {
 	localLogRead, err := os.Open(t.ClientConn.ClientPath + "metadata.dfs")
 	defer localLogRead.Close()
 	if err != nil {
-		log.Println(err)
+		//log.Println(err)
 	}
 	data, _ = ioutil.ReadAll(localLogRead)
 
@@ -128,7 +148,7 @@ func (t File) Write(chunkNum uint8, chunk *Chunk) error {
 	defer localLogWrite.Close()
 	_, err = localLogWrite.Write(readmetaByte)
 	if err != nil {
-		log.Println(err)
+		//log.Println(err)
 	}
 	localLogWrite.Sync()
 
@@ -144,7 +164,7 @@ func (t File) Write(chunkNum uint8, chunk *Chunk) error {
 	t.ClientConn.ServerRPC.Call("ClientToServer.WriteChunk", writeChunkMessage, &resChunkMessage)
 
 	if t.ChunkVersions[chunkNum] >= resChunkMessage.ChunkVersion {
-		log.Println("Error in Writing, new version: ", resChunkMessage.ChunkVersion)
+		//log.Println("Error in Writing, new version: ", resChunkMessage.ChunkVersion)
 	}
 	t.ChunkVersions[chunkNum] = resChunkMessage.ChunkVersion
 
@@ -152,7 +172,7 @@ func (t File) Write(chunkNum uint8, chunk *Chunk) error {
 	localLogReadDelete, err := os.Open(t.ClientConn.ClientPath + "metadata.dfs")
 	defer localLogReadDelete.Close()
 	if err != nil {
-		log.Println(err)
+		//log.Println(err)
 	}
 	data, _ = ioutil.ReadAll(localLogReadDelete)
 	json.Unmarshal(data, &readmeta)
@@ -160,6 +180,9 @@ func (t File) Write(chunkNum uint8, chunk *Chunk) error {
 	localLogWriteDelete, _ := os.Create(t.ClientConn.ClientPath + "metadata.dfs")
 	defer localLogWriteDelete.Close()
 	delete(readmeta.WriteLogs, t.FName)
+	readmetaByte, _ = json.MarshalIndent(readmeta, "", " ")
+	localLogWriteDelete.Write(readmetaByte)
+	localLogWriteDelete.Sync()
 
 	return nil
 }

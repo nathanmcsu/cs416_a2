@@ -128,7 +128,6 @@ func (t *ClientToServer) RetrieveLatestFile(fname string, argFile *sharedData.Ar
 	//Flags for trivial version
 	isTrivial := true      // if there are versions > 0 but the file is offline
 	noModification := true // if there are no versions > 0
-
 	// Get the latest version of each Chunk
 	for chunkIndex, versionMap := range chunkMap {
 		highestV := -1
@@ -204,8 +203,10 @@ func (t *ClientToServer) RetrieveLatestFile(fname string, argFile *sharedData.Ar
 			}
 		}
 	}
-
+	log.Println("Trivial? ", isTrivial)
+	log.Println("Modification?", noModification)
 	if !isTrivial || noModification {
+
 		*argFile = tempDFSFile
 	}
 	return nil
@@ -274,6 +275,8 @@ func (t *ClientToServer) SyncHeartBeat(storedDFSMessage sharedData.StoredDFSMess
 	if _, exists := metadata.ActiveClientMap[storedDFSMessage.ClientID]; exists {
 	} else {
 		metadata.ActiveClientMap[storedDFSMessage.ClientID] = true
+		var total int
+		t.MapAliveClient(storedDFSMessage, &total)
 	}
 	*isConnected = true
 	return nil
@@ -319,11 +322,11 @@ func (t *ClientToServer) GetReadChunk(chunkMessage sharedData.WriteChunkMessage,
 	}
 	chunkVersion := chunkMessage.ChunkVersion
 	for cid, v := range metadata.FileMap[chunkMessage.FName][chunkMessage.ChunkIndex] {
-		if v > highestV {
-			highestV = v
-		}
 		_, isActive := metadata.ActiveClientMap[cid]
 		if v > chunkVersion && isActive {
+			if v > highestV {
+				highestV = v
+			}
 			client := metadata.ClientMap[cid]
 			var fileMessage sharedData.GetFileMessage
 			fileMessage.Fname = chunkMessage.FName

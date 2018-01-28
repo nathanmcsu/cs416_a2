@@ -204,22 +204,22 @@ type DFS interface {
 // - Networking errors related to localIP or serverAddr
 func MountDFS(serverAddr string, localIP string, localPath string) (dfs DFS, err error) {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
-	// TODO
-
 	// Establish connection to server:
 	var isOffline bool
 	conn, err := net.Dial("tcp", serverAddr)
 	if err != nil {
-		log.Println("Failed to establish connection to server: ", serverAddr)
+		//log.Println("Failed to establish connection to server: ", serverAddr)
 		isOffline = true
 	}
-	connDFS := &ConnDFS{IsOffline: isOffline, ServerIP: serverAddr}
+	connDFS := ConnDFS{IsOffline: isOffline, ServerIP: serverAddr}
 	connDFS.ClientPath = localPath
 	if !isOffline {
 		connDFS.ServerRPC = rpc.NewClient(conn)
 	}
 
-	// TODO: Check localPath (LocalPathError)
+	if _, err := os.Stat(localPath); os.IsNotExist(err) {
+		return nil, LocalPathError(localPath)
+	}
 
 	// First check if localPath has existing clientID:
 	metadata, err := os.Open(localPath + "metadata.dfs")
@@ -240,10 +240,11 @@ func MountDFS(serverAddr string, localIP string, localPath string) (dfs DFS, err
 		clientMetaByte, _ := json.MarshalIndent(clientmeta, "", " ")
 
 		metadata.Write(clientMetaByte)
-		metadata.Sync()
 
+		metadata.Sync()
+		metadata.Close()
 	} else if err != nil && isOffline {
-		log.Println("Can't connect to server to establish a new client")
+		// log.Println("Can't connect to server to establish a new client")
 	}
 
 	// Re-open if there was a new file created
@@ -260,17 +261,17 @@ func MountDFS(serverAddr string, localIP string, localPath string) (dfs DFS, err
 		clientIP := localIP + ":0"
 		clientTCPaddr, err := net.ResolveTCPAddr("tcp", clientIP)
 		if err != nil {
-			log.Println(err)
+			// log.Println(err)
 		}
 		tcpConn, err := net.ListenTCP("tcp", clientTCPaddr)
 		if err != nil {
-			log.Println(err)
+			// log.Println(err)
 		}
 		clientTCPIP := localIP + ":" + strconv.Itoa(tcpConn.Addr().(*net.TCPAddr).Port)
 
 		go createUDPServer(clientIP)
 
-		log.Println("Client RCP IP: ", clientTCPIP)
+		// log.Println("Client RCP IP: ", clientTCPIP)
 		clientServer := rpc.NewServer()
 		serverToClient := new(ServerToClient)
 		clientServer.Register(serverToClient)
@@ -287,7 +288,7 @@ func MountDFS(serverAddr string, localIP string, localPath string) (dfs DFS, err
 
 		clientConn, err := net.Dial("tcp", clientTCPIP)
 		if err != nil {
-			log.Println(err)
+			//log.Println(err)
 		}
 		defer clientConn.Close()
 		// udptestConn, err := net.Dial("udp", ClientConnData.udpIP)
@@ -324,7 +325,7 @@ func MountDFS(serverAddr string, localIP string, localPath string) (dfs DFS, err
 func createUDPServer(ipaddr string) {
 	clientUDPaddr, err := net.ResolveUDPAddr("udp", ipaddr)
 	if err != nil {
-		log.Println(err)
+		//log.Println(err)
 	}
 
 	udpConn, _ := net.ListenUDP("udp", clientUDPaddr)

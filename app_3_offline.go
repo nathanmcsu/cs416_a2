@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"time"
 
 	"./dfslib"
 )
@@ -46,7 +47,9 @@ func main() {
 	}
 	log.Println(exists)
 
-	f, err := dfs.Open("helloworld", dfslib.DREAD)
+	time.Sleep(2 * time.Second)
+
+	f, err := dfs.Open("helloworld", dfslib.READ)
 	if checkError(err) != nil {
 		return
 	}

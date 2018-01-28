@@ -2,12 +2,11 @@ package dfslib
 
 import (
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
-	"log"
+	"net"
 	"net/rpc"
 	"os"
-	"unicode"
+	"regexp"
 
 	"../sharedData"
 )
@@ -23,53 +22,63 @@ type ConnDFS struct {
 	ClientUDPIP string
 }
 
+var validChar = regexp.MustCompile("^[a-zA-Z0-9]+$").MatchString
+
 func isValidString(str string) bool {
 	if len(str) > 16 {
 		return false
 	}
-	for _, r := range str {
-		if !unicode.IsLetter(r) {
-			return false
-		}
-	}
-	return true
+	return validChar(str)
 
 }
 
-func (t *ConnDFS) LocalFileExists(fname string) (exists bool, err error) {
+func (t ConnDFS) LocalFileExists(fname string) (exists bool, err error) {
 	if !isValidString(fname) {
 		return false, BadFilenameError(fname)
 	}
 	_, err = os.Open(t.ClientPath + fname + ".dfs")
 	if err != nil {
-		log.Println(err)
+		// log.Println(err)
 		return false, nil
 	}
 	return true, nil
 }
 
-func (t *ConnDFS) GlobalFileExists(fname string) (exists bool, err error) {
+func (t ConnDFS) GlobalFileExists(fname string) (exists bool, err error) {
 	if t.IsOffline {
 		return false, DisconnectedError(t.ServerIP)
+	}
+	if !isValidString(fname) {
+		return false, BadFilenameError(fname)
 	}
 	var isExists bool
 	t.ServerRPC.Call("ClientToServer.CheckGlobalFileExists", fname, &isExists)
 	return isExists, nil
 }
 
-func (t *ConnDFS) Open(fname string, mode FileMode) (f DFSFile, err error) {
+func (t ConnDFS) Open(fname string, mode FileMode) (f DFSFile, err error) {
 
 	// TODO:
-	//		-validate file name (BadFilenameError)
+	//		-validate file name (BadFilenameError) (Done)
 	// 		-if IsOffline true, only DREAD mode allowed (Done, DisconnectedError)
 	// 		-if two writers, only one can succeed (Done OpenWriteConflictError)
 
 	// Populate dfsFile with the right data, dfsFile is return
+	if !isValidString(fname) {
+		return nil, BadFilenameError(fname)
+	}
 	var dfsFile File
 	dfsFile.Mode = mode
 	dfsFile.FName = fname
 	if t.IsOffline && (mode == WRITE || mode == READ) {
-		return nil, DisconnectedError(t.ServerIP)
+		// Try to reconnect first, if connected then don't return error
+		_, err := net.Dial("tcp", t.ServerIP)
+		if err == nil {
+			connDFS, _ := MountDFS(t.ServerIP, t.ClientIP, t.ClientPath)
+			t = connDFS.(ConnDFS)
+		} else {
+			return nil, DisconnectedError(t.ServerIP)
+		}
 	}
 
 	if !t.IsOffline {
@@ -78,7 +87,7 @@ func (t *ConnDFS) Open(fname string, mode FileMode) (f DFSFile, err error) {
 		var fileExists bool
 		err := t.ServerRPC.Call("ClientToServer.CheckGlobalFileExists", fname, &fileExists)
 		if err != nil {
-			fmt.Println(err)
+			// fmt.Println(err)
 			// Search file error
 		}
 
@@ -88,7 +97,7 @@ func (t *ConnDFS) Open(fname string, mode FileMode) (f DFSFile, err error) {
 			writerAndFile := &sharedData.WriterAndFile{Fname: fname, ClientID: t.ClientID}
 			err = t.ServerRPC.Call("ClientToServer.CheckWriterExistsAndAdd", writerAndFile, &writerExists)
 			if err != nil {
-				fmt.Println(err)
+				// fmt.Println(err)
 			}
 			if writerExists {
 				return nil, OpenWriteConflictError(fname)
@@ -107,7 +116,7 @@ func (t *ConnDFS) Open(fname string, mode FileMode) (f DFSFile, err error) {
 				}
 
 				if err != nil {
-					log.Println(err)
+					//log.Println(err)
 				} else {
 					// Make client replica for file
 					file, _ := os.Create(t.ClientPath + fname + ".dfs")
@@ -184,24 +193,23 @@ func (t *ConnDFS) Open(fname string, mode FileMode) (f DFSFile, err error) {
 		file, err := os.Open(t.ClientPath + fname + ".dfs")
 		defer file.Close()
 		if err != nil {
-			log.Println(err)
+			// log.Println(err)
 			return nil, FileDoesNotExistError(fname)
 		}
 		data, err := ioutil.ReadAll(file)
 		if err != nil {
-			log.Println(err)
+			//log.Println(err)
 		}
 		var fileChunks [256]Chunk
 		json.Unmarshal(data, &fileChunks)
 		dfsFile.FileChunks = fileChunks
 
 	}
-	//  TODO
-	//		Write File contents to disk after successful acquire
-	dfsFile.ClientConn = *t
+
+	dfsFile.ClientConn = t
 	return dfsFile, nil
 }
-func (t *ConnDFS) UMountDFS() error {
+func (t ConnDFS) UMountDFS() error {
 	var isConnected bool
 	storedDFSMessage := &sharedData.StoredDFSMessage{
 		ClientIP:   t.ClientIP,
@@ -219,7 +227,7 @@ func (t *ConnDFS) UMountDFS() error {
 		var isOk bool
 		t.ServerRPC.Call("ClientToServer.CloseConnection", t.ClientID, &isOk)
 
-		ClientConnData.rpcConn.Close()
+		//ClientConnData.rpcConn.Close()
 		// ClientConnData.udpConn.Close()
 	}
 	return nil
