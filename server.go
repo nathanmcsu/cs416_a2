@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"net"
 	"net/rpc"
@@ -17,7 +16,7 @@ func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	args := os.Args[1:]
 	if len(args) != 1 {
-		log.Fatal("Usage: server.go [Client-incoming UDP ip:port]")
+		//log.Fatal("Usage: server.go [Client-incoming UDP ip:port]")
 	}
 	localPort := args[0]
 	server := rpc.NewServer()
@@ -27,9 +26,9 @@ func main() {
 	server.Register(clientToServerRPC)
 	tcpConn, err := net.Listen("tcp", localPort)
 	if err != nil {
-		log.Fatal("Failed to establish TCP:", err)
+		//log.Fatal("Failed to establish TCP:", err)
 	}
-	fmt.Println("Listening on: ", localPort)
+	//fmt.Println("Listening on: ", localPort)
 
 	metadata.FileMap = make(map[string]map[int]map[int]int)
 	metadata.ClientMap = make(map[int]sharedData.StoredDFS)

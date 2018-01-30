@@ -2,7 +2,6 @@ package rpcDefs
 
 import (
 	"encoding/json"
-	"log"
 	"net"
 	"net/rpc"
 	"time"
@@ -17,7 +16,7 @@ func startHeartBeats(storedDFSMsg sharedData.StoredDFSMessage) {
 	//log.Println("startHeartBeats on: ", storedDFSMsg.ClientUDPIP)
 	udpAddr, _ := net.ResolveUDPAddr("udp", metadata.ServerIP)
 	conn, _ := net.ListenUDP("udp", udpAddr)
-	log.Println("Server port: ", conn.LocalAddr().String())
+	//log.Println("Server port: ", conn.LocalAddr().String())
 	isAlive := true
 	for isAlive {
 		isAlive = heartBeat(storedDFSMsg.ClientUDPIP, conn)
@@ -26,7 +25,7 @@ func startHeartBeats(storedDFSMsg sharedData.StoredDFSMessage) {
 
 	// TODO, close active connections with client
 	CloseConnectionNoRPC(storedDFSMsg.ClientID)
-	log.Println("Client is dead")
+	//log.Println("Client is dead")
 }
 
 func heartBeat(clientIP string, conn *net.UDPConn) bool {
@@ -79,13 +78,13 @@ func heartBeat(clientIP string, conn *net.UDPConn) bool {
 type ClientToServer rpc.Client
 
 func (t *ClientToServer) CheckGlobalFileExists(fname string, exists *bool) error {
-	log.Println("GlobalFileExists")
+	//log.Println("GlobalFileExists")
 	_, ok := metadata.FileMap[fname]
 	*exists = ok
 	return nil
 }
 func (t *ClientToServer) GetNewCID(localPath string, cid *int) error {
-	log.Println("GetNewCID")
+	//log.Println("GetNewCID")
 	newCID := len(metadata.ClientMap)
 	*cid = newCID
 	return nil
@@ -93,13 +92,13 @@ func (t *ClientToServer) GetNewCID(localPath string, cid *int) error {
 
 // Puts active clients in metadata and stores information
 func (t *ClientToServer) MapAliveClient(storedDFSMsg sharedData.StoredDFSMessage, total *int) error {
-	log.Println("MapAliveClient")
+	//log.Println("MapAliveClient")
 	// TODO:
 	//		Start go routine to call client UDP
 	storedDFS := &sharedData.StoredDFS{ClientID: storedDFSMsg.ClientID, ClientIP: storedDFSMsg.ClientIP, ClientPath: storedDFSMsg.ClientPath}
 	conn, err := net.Dial("tcp", storedDFS.ClientIP)
 	if err != nil {
-		log.Println("Failed to establish connection to client: ", storedDFS.ClientIP)
+		//log.Println("Failed to establish connection to client: ", storedDFS.ClientIP)
 	}
 	rpcConn := rpc.NewClient(conn)
 	storedDFS.ClientRPC = rpcConn
@@ -118,7 +117,7 @@ func (t *ClientToServer) MapAliveClient(storedDFSMsg sharedData.StoredDFSMessage
 
 // Retrieve the latest possible file, only checks version and if client is active, might be stale
 func (t *ClientToServer) RetrieveLatestFile(fname string, argFile *sharedData.ArgFile) error {
-	log.Println("RetrieveLatestFile")
+	//log.Println("RetrieveLatestFile")
 	tempDFSFile := sharedData.ArgFile{FName: fname}
 	chunkMap := metadata.FileMap[fname]
 
@@ -197,14 +196,12 @@ func (t *ClientToServer) RetrieveLatestFile(fname string, argFile *sharedData.Ar
 						tempDFSFile.FileChunks[chunkIndex] = fileChunks[chunkIndex]
 						tempDFSFile.ChunkVersions[chunkIndex] = v
 					} else {
-						log.Println(err)
+						//log.Println(err)
 					}
 				}
 			}
 		}
 	}
-	log.Println("Trivial? ", isTrivial)
-	log.Println("Modification?", noModification)
 	if !isTrivial || noModification {
 
 		*argFile = tempDFSFile
@@ -214,7 +211,7 @@ func (t *ClientToServer) RetrieveLatestFile(fname string, argFile *sharedData.Ar
 
 // Add new file to file map
 func (t *ClientToServer) AddNewFile(fileCMap sharedData.FileChunkMap, argok *bool) error {
-	log.Println("AddNewFile")
+	//log.Println("AddNewFile")
 	_, exists := metadata.FileMap[fileCMap.FName]
 	if !exists {
 		metadata.FileMap[fileCMap.FName] = fileCMap.ChunkMap
@@ -225,7 +222,7 @@ func (t *ClientToServer) AddNewFile(fileCMap sharedData.FileChunkMap, argok *boo
 
 // Adds a new client to file map
 func (t *ClientToServer) AddNewReplica(replicaEntryMessage sharedData.ReplicaEntry, argok *bool) error {
-	log.Println("AddNewReplica")
+	//log.Println("AddNewReplica")
 	chunkMap := metadata.FileMap[replicaEntryMessage.Fname]
 	for chunkIndex, versionMap := range chunkMap {
 		versionMap[replicaEntryMessage.ClientID] = replicaEntryMessage.VersionEntries[chunkIndex]
@@ -234,14 +231,14 @@ func (t *ClientToServer) AddNewReplica(replicaEntryMessage sharedData.ReplicaEnt
 }
 
 func (t *ClientToServer) CreateListenerClient(clientAddr string, x *bool) error {
-	log.Println("CreateListenerClient")
+	//log.Println("CreateListenerClient")
 	// TODO: clear if not needed
 	return nil
 }
 
 // Check and gets lock for file to write
 func (t *ClientToServer) CheckWriterExistsAndAdd(writerAndFile sharedData.WriterAndFile, writerExists *bool) error {
-	log.Println("CheckWriterExistsAndAdd")
+	//log.Println("CheckWriterExistsAndAdd")
 	_, exists := metadata.ActiveFiles[writerAndFile.Fname]
 	if !exists {
 		// Add writer to ActiveFiles
@@ -253,7 +250,7 @@ func (t *ClientToServer) CheckWriterExistsAndAdd(writerAndFile sharedData.Writer
 
 // Update metadata with new chunk version and unlock chunk for other readers
 func (t *ClientToServer) WriteChunk(writeChunkMessage sharedData.WriteChunkMessage, resChunkMessage *sharedData.WriteChunkMessage) error {
-	log.Println("WriteChunk")
+	//log.Println("WriteChunk")
 	metadata.FileMap[writeChunkMessage.FName][writeChunkMessage.ChunkIndex][writeChunkMessage.ClientID] = writeChunkMessage.ChunkVersion + 1
 	*resChunkMessage = sharedData.WriteChunkMessage{
 		FName:        writeChunkMessage.FName,
@@ -270,7 +267,7 @@ func (t *ClientToServer) WriteChunk(writeChunkMessage sharedData.WriteChunkMessa
 
 // Single heartbeat to check if still connected
 func (t *ClientToServer) SyncHeartBeat(storedDFSMessage sharedData.StoredDFSMessage, isConnected *bool) error {
-	log.Println("SyncHeartBeat")
+	//log.Println("SyncHeartBeat")
 
 	if _, exists := metadata.ActiveClientMap[storedDFSMessage.ClientID]; exists {
 	} else {
@@ -284,7 +281,7 @@ func (t *ClientToServer) SyncHeartBeat(storedDFSMessage sharedData.StoredDFSMess
 
 //Lock chunk for a write
 func (t *ClientToServer) BlockChunk(chunkMessage sharedData.WriteChunkMessage, canWrite *bool) error {
-	log.Println("BlockChunk")
+	//log.Println("BlockChunk")
 	// TODO, check if there is read on that block, block until done read
 	_, exists := metadata.ActiveClientMap[chunkMessage.ClientID] // Check if connected
 	_, hasLock := metadata.ActiveFiles[chunkMessage.FName]       // Check if it has lock on file to write
@@ -306,7 +303,7 @@ func (t *ClientToServer) BlockChunk(chunkMessage sharedData.WriteChunkMessage, c
 
 //Lock chunk for a write
 func (t *ClientToServer) GetReadChunk(chunkMessage sharedData.WriteChunkMessage, resChunk *[32]byte) error {
-	log.Println("GetReadChunk")
+	//log.Println("GetReadChunk")
 	_, exists := metadata.ActiveWriteChunks[chunkMessage.FName][chunkMessage.ChunkIndex]
 	tempDFSFile := sharedData.ArgFile{FName: chunkMessage.FName}
 	highestV := -1
@@ -346,7 +343,7 @@ func (t *ClientToServer) GetReadChunk(chunkMessage sharedData.WriteChunkMessage,
 				tempDFSFile.ChunkVersions[chunkMessage.ChunkIndex] = v
 				*resChunk = fileChunks[chunkMessage.ChunkIndex]
 			} else {
-				log.Println(err)
+				//log.Println(err)
 			}
 		}
 	}
@@ -358,7 +355,7 @@ func (t *ClientToServer) GetReadChunk(chunkMessage sharedData.WriteChunkMessage,
 
 // Unlocks file for other writes
 func (t *ClientToServer) CloseFile(writerAndFile sharedData.WriterAndFile, isOk *bool) error {
-	log.Println("CloseFile")
+	//log.Println("CloseFile")
 	// There shouldn't be any in Active Write Chunks, but checking just in case:
 	chunkMap, exists := metadata.ActiveWriteChunks[writerAndFile.Fname]
 	if exists {
@@ -382,14 +379,14 @@ func (t *ClientToServer) CloseFile(writerAndFile sharedData.WriterAndFile, isOk 
 
 // Removes client from active client list
 func (t *ClientToServer) CloseConnection(clientID int, isOk *bool) error {
-	log.Println("CloseConnection")
+	//log.Println("CloseConnection")
 	CloseConnectionNoRPC(clientID)
 	*isOk = true
 	return nil
 }
 
 func CloseConnectionNoRPC(clientID int) {
-	log.Println("CloseConnectionNoRPC")
+	//log.Println("CloseConnectionNoRPC")
 	delete(metadata.ActiveClientMap, clientID)
 
 	// There shouldn't be any in Active Write Chunks, but checking just in case:

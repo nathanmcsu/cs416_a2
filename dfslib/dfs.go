@@ -81,7 +81,7 @@ func (t ConnDFS) Open(fname string, mode FileMode) (f DFSFile, err error) {
 		}
 	}
 
-	if !t.IsOffline {
+	if !t.IsOffline && mode != DREAD {
 		// Online
 		// Check if File exists first
 		var fileExists bool
