@@ -1,13 +1,528 @@
-Total mark: [100/100]
+Total mark: [68/100]
 ---------------------------------------------------
 
-Connected operation [60/100
-* One client; example scenarios [20/100]
-* One reader/writer client and one writer client; example scenarios [20/100]
-* Multiple reader clients and one writer client; example scenarios [20/100]
+Late penalty: 0
 
-Disconnected operation [40/100]
-* One client; example scenarios [20/100]
-* One reader/writer client and one writer client; example scenarios [10/100]
-* Multiple reader clients and one writer client; example scenarios [10/100]
+Connected operation [52/100]
+* Simple open: Client mounts DFS, opens a file, closes it, and then unmounts DFS [3/100]
+* Simple read: Client mounts DFS, opens a file, reads it, closes it, and then unmounts DFS [3/100]
+* Simple write: Client mounts DFS, opens a file, writes to it, reads it, closes it, and then unmounts DFS. [3/100]
+* Simple LocalFileExists: Client mounts DFS, opens a file, closes it, calls LocalFileExists on the file name, and then unmounts DFS [3/100]
+* Simple GlobalFileExists: Client mounts DFS, opens a file, closes it, calls GlobalFileExists on the file name, and then unmounts DFS [0/100]
+* Single client: Client A mounts DFS, opens an invalid file, opens a valid file, reads it, writes it, reads the content back, closes it, and unmounts DFS; client B mounts DFS, calls GlobalFileExists on the file name, cals LocalFileExists on the file name, opens the file, and then unmounts DFS [5/100]
+* One client is able to observe writes from another client (single write operation) [7/100]
+* One client is able to observe writes from another client (double write operation) [8/100]
+* Handling multiple clients attempting to open a file for writing [5/100]
+* Multiple reader clients and one writer client; One client opens for writing, other clients check global file exists [5/100]
+* Multiple reader clients and one writer client; One client opens for writing, other clients open for reading. First client performs three writes, other clients read after each write. [0/100]
+* Multiple reader clients and one writer client; First client writes file, other clients read the changes, first client closes the file. Repeated for each client [10/100]
+
+Disconnected operation [16/100]
+* Client writes file, disconnects; can use DREAD while disconnected [0/100]
+* Client writes file, disconnects; can LocalFileExists while disconnected [0/100]
+* Unobservable transitory disconnections [10/100]
+* Client A opens file F for writing, disconnects. Client B connects and opens F for writing, succeeds [2/100]
+* Client B opens file. Client A writes/closes file, disconnects. Client B writes file. Client A re-connects, reads, observes B changes [0/100]
+* Client A writes file. Client B opens file. Client A writes file, disconnects. Client B observe changes [4/100]
+* Multiple reader clients and one writer client; A opens, A writes, B opens, A disconnects, C opens, C reads [0/100]
+* Multiple reader clients and one writer client; client A opens, B opens, A writes, B reads, A disconnects, C opens, C reads [0/100]
+* Multiple reader clients and one writer client; client A opens, A writes, A closes, B opens, A disconnects, B reads, B writes, B closes, C opens, B disconnects, C reads, C writes, C closes [0/100]
+
+
+===================
+Test execution logs
+===================
+Commit used: d0d36fa39efe317090450c4069833e8508acae3b got rid of logs and fixed Dread bug
+
+
+
+===================
+
+[TESTS] Running command [~/master -server 10.1.1.7:4444 -test test.json] on Azure VM
+[2018-03-01 07:45:16][Master] Starting test 'DISCONNECTED -- Client writes file, disconnects; can use DREAD while disconnected'
+[2018-03-01 07:45:16][Master] Setting up RPC interface at 10.1.1.6:8484
+[2018-03-01 07:45:16][Client A] Mounting DFS at /tmp/clientA
+[2018-03-01 07:45:16][Client A] DFS mounted
+[2018-03-01 07:45:16][Client A] Opening file 'thefile' for WRITE
+[2018-03-01 07:45:16][Client A] Writing 'Hello from CPSC 416!' on chunk 3 of file 'thefile'
+[2018-03-01 07:45:16][Client A] Closing file 'thefile'
+[2018-03-01 07:45:16][Client A] Going offline (losing connection with server at 10.1.1.7)
+[2018-03-01 07:45:16][Client A] Opening file 'thefile' for DREAD
+[2018-03-01 07:45:16][Client A] Reading chunk 3 from file 'thefile' (expects: 'Hello from CPSC 416!')
+[2018-03-01 07:45:16][Client A] Closing file 'thefile'
+[2018-03-01 07:45:26][Master] Requesting Client A to stop
+
+Test ended abruptly with error: Operation Close on client A timed out
+
+
+===================
+
+[TESTS] Running command [~/master -server 10.1.1.7:4444 -test test.json] on Azure VM
+[2018-03-01 07:45:32][Master] Starting test 'DISCONNECTED -- Client writes file, disconnects; can use LocalFileExists while disconnected'
+[2018-03-01 07:45:32][Master] Setting up RPC interface at 10.1.1.6:8484
+[2018-03-01 07:45:32][Client A] Mounting DFS at /tmp/clientA
+[2018-03-01 07:45:32][Client A] DFS mounted
+[2018-03-01 07:45:32][Client A] Opening file 'thefile' for WRITE
+[2018-03-01 07:45:33][Client A] Writing 'Hello from CPSC 416!' on chunk 3 of file 'thefile'
+[2018-03-01 07:45:33][Client A] Closing file 'thefile'
+[2018-03-01 07:45:33][Client A] Going offline (losing connection with server at 10.1.1.7)
+[2018-03-01 07:45:33][Client A] Checking if file 'thefile' exists locally (expects: true)
+[2018-03-01 07:45:33][Client A] Disconnecting
+[2018-03-01 07:45:43][Master] Requesting Client A to stop
+
+Test ended abruptly with error: Operation UMountDFS on client A timed out
+
+
+===================
+
+[TESTS] Running command [~/master -server 10.1.1.7:4444 -test test.json] on Azure VM
+[2018-03-01 07:45:50][Master] Starting test 'DISCONNECTED -- Three Clients - Each client writes and disconnects'
+[2018-03-01 07:45:50][Master] Setting up RPC interface at 10.1.1.6:8484
+[2018-03-01 07:45:50][Client A] Mounting DFS at /tmp/clientA
+[2018-03-01 07:45:50][Client A] DFS mounted
+[2018-03-01 07:45:50][Client B] Mounting DFS at /tmp/clientB
+[2018-03-01 07:45:50][Client B] DFS mounted
+[2018-03-01 07:45:50][Client C] Mounting DFS at /tmp/clientC
+[2018-03-01 07:45:50][Client C] DFS mounted
+[2018-03-01 07:45:50][Client A] Opening file 'thefile' for WRITE
+[2018-03-01 07:45:50][Client A] Writing 'Hello from CPSC 416!' on chunk 3 of file 'thefile'
+[2018-03-01 07:45:50][Client A] Closing file 'thefile'
+[2018-03-01 07:45:50][Client B] Opening file 'thefile' for WRITE
+[2018-03-01 07:45:50][Client A] Going offline (losing connection with server at 10.1.1.7)
+[2018-03-01 07:45:50][Client B] Reading chunk 3 from file 'thefile' (expects: 'Hello from CPSC 416!')
+[2018-03-01 07:45:50][Client B] Writing 'Not hello anymore.' on chunk 3 of file 'thefile'
+[2018-03-01 07:45:50][Client B] Closing file 'thefile'
+[2018-03-01 07:45:50][Client C] Opening file 'thefile' for WRITE
+[2018-03-01 07:46:00][Master] Requesting Client A to stop
+[2018-03-01 07:46:00][Master] Requesting Client B to stop
+[2018-03-01 07:46:00][Master] Requesting Client C to stop
+
+Test ended abruptly with error: Operation Open on client C timed out
+
+
+===================
+
+[TESTS] Running command [~/master -server 10.1.1.7:4444 -test test.json] on Azure VM
+[2018-03-01 07:46:10][Master] Starting test 'DISCONNECTED -- Three Clients - A Opens, A Writes, B Opens,  A disconnects, C Opens, C Reads'
+[2018-03-01 07:46:10][Master] Setting up RPC interface at 10.1.1.6:8484
+[2018-03-01 07:46:10][Client A] Mounting DFS at /tmp/clientA
+[2018-03-01 07:46:10][Client A] DFS mounted
+[2018-03-01 07:46:10][Client B] Mounting DFS at /tmp/clientB
+[2018-03-01 07:46:10][Client B] DFS mounted
+[2018-03-01 07:46:10][Client A] Opening file 'thefile' for WRITE
+[2018-03-01 07:46:10][Client A] Writing 'Hello from CPSC 416!' on chunk 3 of file 'thefile'
+[2018-03-01 07:46:10][Client B] Opening file 'thefile' for READ
+[2018-03-01 07:46:10][Client A] Going offline (losing connection with server at 10.1.1.7)
+[2018-03-01 07:46:10][Client C] Mounting DFS at /tmp/clientC
+[2018-03-01 07:46:10][Client C] DFS mounted
+[2018-03-01 07:46:10][Client C] Opening file 'thefile' for READ
+[2018-03-01 07:46:20][Master] Requesting Client A to stop
+[2018-03-01 07:46:20][Master] Requesting Client B to stop
+[2018-03-01 07:46:20][Master] Requesting Client C to stop
+
+Test ended abruptly with error: Operation Open on client C timed out
+
+
+===================
+
+[TESTS] Running command [~/master -server 10.1.1.7:4444 -test test.json] on Azure VM
+[2018-03-01 07:46:29][Master] Starting test 'DISCONNECTED --  Three Clients: A Opens, B Opens, A Writes, B Reads, A disconnects, C Opens, C Reads'
+[2018-03-01 07:46:29][Master] Setting up RPC interface at 10.1.1.6:8484
+[2018-03-01 07:46:29][Client A] Mounting DFS at /tmp/clientA
+[2018-03-01 07:46:29][Client A] DFS mounted
+[2018-03-01 07:46:29][Client B] Mounting DFS at /tmp/clientB
+[2018-03-01 07:46:29][Client B] DFS mounted
+[2018-03-01 07:46:29][Client A] Opening file 'thefile' for WRITE
+[2018-03-01 07:46:29][Client B] Opening file 'thefile' for READ
+[2018-03-01 07:46:29][Client A] Writing 'Hello from CPSC 416!' on chunk 3 of file 'thefile'
+[2018-03-01 07:46:29][Client B] Reading chunk 3 from file 'thefile' (expects: 'Hello from CPSC 416!')
+[2018-03-01 07:46:30][Client A] Going offline (losing connection with server at 10.1.1.7)
+[2018-03-01 07:46:30][Client C] Mounting DFS at /tmp/clientC
+[2018-03-01 07:46:30][Client C] DFS mounted
+[2018-03-01 07:46:30][Client C] Opening file 'thefile' for READ
+[2018-03-01 07:46:40][Master] Requesting Client A to stop
+[2018-03-01 07:46:40][Master] Requesting Client B to stop
+[2018-03-01 07:46:40][Master] Requesting Client C to stop
+
+Test ended abruptly with error: Operation Open on client C timed out
+
+
+===================
+
+[TESTS] Running command [~/master -server 10.1.1.7:4444 -test test.json] on Azure VM
+[2018-03-01 07:46:48][Master] Starting test 'Disconnected — One reader/writer client and one writer client[3]'
+[2018-03-01 07:46:48][Master] Setting up RPC interface at 10.1.1.6:8484
+[2018-03-01 07:46:48][Client A] Mounting DFS at /tmp/clientA
+[2018-03-01 07:46:48][Client A] DFS mounted
+[2018-03-01 07:46:48][Client A] Opening file 'drww3' for WRITE
+[2018-03-01 07:46:48][Client A] Writing 'drww3data1' on chunk 2 of file 'drww3'
+[2018-03-01 07:46:48][Client B] Mounting DFS at /tmp/clientB
+[2018-03-01 07:46:48][Client B] DFS mounted
+[2018-03-01 07:46:48][Client B] Opening file 'drww3' for READ
+[2018-03-01 07:46:49][Client A] Writing 'drww3data' on chunk 2 of file 'drww3'
+[2018-03-01 07:46:49][Client A] Closing file 'drww3'
+[2018-03-01 07:46:49][Client A] Going offline (losing connection with server at 10.1.1.7)
+[2018-03-01 07:46:49][Client B] Sleeping for 5 seconds
+[2018-03-01 07:46:54][Client B] Reading chunk 2 from file 'drww3' (expects: 'drww3data')
+[2018-03-01 07:46:54][Client B] Closing file 'drww3'
+[2018-03-01 07:46:54][Client B] Disconnecting
+[2018-03-01 07:46:54][Master] Requesting Client A to stop
+[2018-03-01 07:46:54][Master] Requesting Client B to stop
+
+SUCCESS
+
+
+===================
+
+[TESTS] Running command [~/master -server 10.1.1.7:4444 -test test.json] on Azure VM
+[2018-03-01 07:47:01][Master] Starting test 'Disconnected -- One reader/writer client and one writer client[1]'
+[2018-03-01 07:47:01][Master] Setting up RPC interface at 10.1.1.6:8484
+[2018-03-01 07:47:01][Client A] Mounting DFS at /tmp/clientA
+[2018-03-01 07:47:01][Client A] DFS mounted
+[2018-03-01 07:47:01][Client A] Opening file 'drww1' for WRITE
+[2018-03-01 07:47:02][Client A] Going offline (losing connection with server at 10.1.1.7)
+[2018-03-01 07:47:02][Client B] Sleeping for 5 seconds
+[2018-03-01 07:47:07][Client B] Mounting DFS at /tmp/clientB
+[2018-03-01 07:47:07][Client B] DFS mounted
+[2018-03-01 07:47:07][Client B] Opening file 'drww1' for WRITE
+[2018-03-01 07:47:07][Client B] Writing 'drww1data2' on chunk 3 of file 'drww1'
+[2018-03-01 07:47:07][Client B] Reading chunk 3 from file 'drww1' (expects: 'drww1data2')
+[2018-03-01 07:47:07][Client B] Closing file 'drww1'
+[2018-03-01 07:47:07][Client B] Disconnecting
+[2018-03-01 07:47:07][Master] Requesting Client B to stop
+[2018-03-01 07:47:07][Master] Requesting Client A to stop
+
+SUCCESS
+
+
+===================
+
+[TESTS] Running command [~/master -server 10.1.1.7:4444 -test test.json] on Azure VM
+[2018-03-01 07:47:14][Master] Starting test 'Disconnected — One reader/writer client and one writer client[2]'
+[2018-03-01 07:47:14][Master] Setting up RPC interface at 10.1.1.6:8484
+[2018-03-01 07:47:14][Client B] Mounting DFS at /tmp/clientB
+[2018-03-01 07:47:14][Client B] DFS mounted
+[2018-03-01 07:47:14][Client B] Opening file 'drww2' for WRITE
+[2018-03-01 07:47:14][Client B] Closing file 'drww2'
+[2018-03-01 07:47:14][Client A] Mounting DFS at /tmp/clientA
+[2018-03-01 07:47:14][Client A] DFS mounted
+[2018-03-01 07:47:14][Client A] Opening file 'drww2' for WRITE
+[2018-03-01 07:47:15][Client A] Writing 'drww2data1' on chunk 2 of file 'drww2'
+[2018-03-01 07:47:15][Client A] Closing file 'drww2'
+[2018-03-01 07:47:15][Client A] Going offline (losing connection with server at 10.1.1.7)
+[2018-03-01 07:47:15][Client B] Sleeping for 5 seconds
+[2018-03-01 07:47:20][Client B] Opening file 'drww2' for WRITE
+[2018-03-01 07:47:20][Master] Requesting Client A to stop
+[2018-03-01 07:47:20][Master] Requesting Client B to stop
+
+Test ended abruptly with error: Error processing 'Open' by Client B: DFS: Filename [drww2] is unavailable
+
+
+===================
+
+[TESTS] Running command [~/master -server 10.1.1.7:4444 -test test.json] on Azure VM
+[2018-03-01 07:47:27][Master] Starting test 'Disconnected — One reader/writer client and one writer client[3]'
+[2018-03-01 07:47:27][Master] Setting up RPC interface at 10.1.1.6:8484
+[2018-03-01 07:47:28][Client A] Mounting DFS at /tmp/clientA
+[2018-03-01 07:47:28][Client A] DFS mounted
+[2018-03-01 07:47:28][Client A] Opening file 'drww3' for WRITE
+[2018-03-01 07:47:28][Client A] Writing 'drww3data1' on chunk 2 of file 'drww3'
+[2018-03-01 07:47:28][Client B] Mounting DFS at /tmp/clientB
+[2018-03-01 07:47:28][Client B] DFS mounted
+[2018-03-01 07:47:28][Client B] Opening file 'drww3' for READ
+[2018-03-01 07:47:28][Client A] Writing 'drww3data' on chunk 2 of file 'drww3'
+[2018-03-01 07:47:28][Client A] Closing file 'drww3'
+[2018-03-01 07:47:28][Client A] Going offline (losing connection with server at 10.1.1.7)
+[2018-03-01 07:47:28][Client B] Sleeping for 5 seconds
+[2018-03-01 07:47:33][Client B] Reading chunk 2 from file 'drww3' [error expected: ChunkUnavailableError]
+[2018-03-01 07:47:33][Master] Requesting Client A to stop
+[2018-03-01 07:47:33][Master] Requesting Client B to stop
+
+Test ended abruptly with error: Error processing 'Read' by Client B: Expected Read on 'drww3' to return error ChunkUnavailableError, but it was successful.
+
+
+===================
+
+[TESTS] Running command [~/master -server 10.1.1.7:4444 -test test.json] on Azure VM
+[2018-03-01 07:47:41][Master] Starting test 'CONNECTED -- Three Clients Read And Write File'
+[2018-03-01 07:47:41][Master] Setting up RPC interface at 10.1.1.6:8484
+[2018-03-01 07:47:41][Client A] Mounting DFS at /tmp/clientA
+[2018-03-01 07:47:41][Client A] DFS mounted
+[2018-03-01 07:47:41][Client B] Mounting DFS at /tmp/clientB
+[2018-03-01 07:47:41][Client B] DFS mounted
+[2018-03-01 07:47:41][Client C] Mounting DFS at /tmp/clientC
+[2018-03-01 07:47:41][Client C] DFS mounted
+[2018-03-01 07:47:41][Client A] Opening file 'thefile' for WRITE
+[2018-03-01 07:47:41][Client B] Opening file 'thefile' for READ
+[2018-03-01 07:47:41][Client C] Opening file 'thefile' for READ
+[2018-03-01 07:47:41][Client A] Writing 'Hello from CPSC 416!' on chunk 3 of file 'thefile'
+[2018-03-01 07:47:41][Client B] Reading chunk 3 from file 'thefile' (expects: 'Hello from CPSC 416!')
+[2018-03-01 07:47:41][Client C] Reading chunk 3 from file 'thefile' (expects: 'Hello from CPSC 416!')
+[2018-03-01 07:47:41][Client A] Closing file 'thefile'
+[2018-03-01 07:47:41][Client B] Closing file 'thefile'
+[2018-03-01 07:47:41][Client B] Opening file 'thefile' for WRITE
+[2018-03-01 07:47:41][Client B] Writing 'Not a Hello anymore' on chunk 3 of file 'thefile'
+[2018-03-01 07:47:41][Client A] Opening file 'thefile' for READ
+[2018-03-01 07:47:41][Client A] Reading chunk 3 from file 'thefile' (expects: 'Not a Hello anymore')
+[2018-03-01 07:47:41][Client C] Reading chunk 3 from file 'thefile' (expects: 'Not a Hello anymore')
+[2018-03-01 07:47:41][Client A] Closing file 'thefile'
+[2018-03-01 07:47:41][Client B] Closing file 'thefile'
+[2018-03-01 07:47:41][Client C] Closing file 'thefile'
+[2018-03-01 07:47:41][Client A] Disconnecting
+[2018-03-01 07:47:41][Client B] Disconnecting
+[2018-03-01 07:47:41][Client C] Disconnecting
+[2018-03-01 07:47:41][Master] Requesting Client A to stop
+[2018-03-01 07:47:41][Master] Requesting Client B to stop
+[2018-03-01 07:47:41][Master] Requesting Client C to stop
+
+SUCCESS
+
+
+===================
+
+[TESTS] Running command [~/master -server 10.1.1.7:4444 -test test.json] on Azure VM
+[2018-03-01 07:47:51][Master] Starting test 'CONNECTED -- Three Clients: One Client Writes, Other Clients Read'
+[2018-03-01 07:47:51][Master] Setting up RPC interface at 10.1.1.6:8484
+[2018-03-01 07:47:51][Client A] Mounting DFS at /tmp/clientA
+[2018-03-01 07:47:51][Client A] DFS mounted
+[2018-03-01 07:47:51][Client B] Mounting DFS at /tmp/clientB
+[2018-03-01 07:47:51][Client B] DFS mounted
+[2018-03-01 07:47:51][Client C] Mounting DFS at /tmp/clientC
+[2018-03-01 07:47:51][Client C] DFS mounted
+[2018-03-01 07:47:51][Client A] Opening file 'thefile' for WRITE
+[2018-03-01 07:47:51][Client B] Opening file 'thefile' for READ
+[2018-03-01 07:47:51][Client C] Opening file 'thefile' for READ
+[2018-03-01 07:47:51][Client A] Writing 'Hello from CPSC 416!' on chunk 3 of file 'thefile'
+[2018-03-01 07:47:51][Client B] Reading chunk 3 from file 'thefile' (expects: 'Hello from CPSC 416!')
+[2018-03-01 07:47:51][Client C] Reading chunk 3 from file 'thefile' (expects: 'Hello from CPSC 416!')
+[2018-03-01 07:47:51][Client A] Writing 'Not a Hello anymore' on chunk 3 of file 'thefile'
+[2018-03-01 07:47:51][Client B] Reading chunk 3 from file 'thefile' (expects: 'Not a Hello anymore')
+[2018-03-01 07:47:51][Client C] Reading chunk 3 from file 'thefile' (expects: 'Not a Hello anymore')
+[2018-03-01 07:47:51][Client A] Writing 'No it's not' on chunk 3 of file 'thefile'
+[2018-03-01 07:47:51][Client B] Reading chunk 3 from file 'thefile' (expects: 'No it's not')
+[2018-03-01 07:47:51][Master] Requesting Client A to stop
+[2018-03-01 07:47:51][Master] Requesting Client B to stop
+[2018-03-01 07:47:51][Master] Requesting Client C to stop
+
+Test ended abruptly with error: Error processing 'Read' by Client B: Read failure: Expected: 'No it's not' Got: '           '
+
+
+===================
+
+[TESTS] Running command [~/master -server 10.1.1.7:4444 -test test.json] on Azure VM
+[2018-03-01 07:48:01][Master] Starting test 'CONNECTED -- Clients open files and other clients check file exists'
+[2018-03-01 07:48:01][Master] Setting up RPC interface at 10.1.1.6:8484
+[2018-03-01 07:48:01][Client A] Mounting DFS at /tmp/clientA
+[2018-03-01 07:48:01][Client A] DFS mounted
+[2018-03-01 07:48:01][Client B] Mounting DFS at /tmp/clientB
+[2018-03-01 07:48:01][Client B] DFS mounted
+[2018-03-01 07:48:01][Client C] Mounting DFS at /tmp/clientC
+[2018-03-01 07:48:01][Client C] DFS mounted
+[2018-03-01 07:48:01][Client A] Opening file 'thefileA' for Write
+[2018-03-01 07:48:01][Client C] Checking if file 'thefileB' exists globally (expects: false)
+[2018-03-01 07:48:01][Client B] Opening file 'thefileB' for Write
+[2018-03-01 07:48:01][Client B] Checking if file 'thefileA' exists globally (expects: true)
+[2018-03-01 07:48:01][Client C] Checking if file 'thefileB' exists globally (expects: true)
+[2018-03-01 07:48:01][Client A] Checking if file 'thefileB' exists globally (expects: true)
+[2018-03-01 07:48:01][Master] Requesting Client C to stop
+[2018-03-01 07:48:01][Master] Requesting Client A to stop
+[2018-03-01 07:48:01][Master] Requesting Client B to stop
+
+SUCCESS
+
+
+===================
+
+[TESTS] Running command [~/master -server 10.1.1.7:4444 -test test.json] on Azure VM
+[2018-03-01 07:48:09][Master] Starting test 'CONNECTED -- Observing writes (double write)'
+[2018-03-01 07:48:09][Master] Setting up RPC interface at 10.1.1.6:8484
+[2018-03-01 07:48:09][Client A] Mounting DFS at /tmp/clientA
+[2018-03-01 07:48:09][Client A] DFS mounted
+[2018-03-01 07:48:09][Client B] Mounting DFS at /tmp/clientB
+[2018-03-01 07:48:09][Client B] DFS mounted
+[2018-03-01 07:48:09][Client A] Opening file 'myfile' for WRITE
+[2018-03-01 07:48:09][Client A] Writing 'Written by A' on chunk 3 of file 'myfile'
+[2018-03-01 07:48:10][Client A] Closing file 'myfile'
+[2018-03-01 07:48:10][Client B] Opening file 'myfile' for WRITE
+[2018-03-01 07:48:10][Client B] Writing 'Written by B' on chunk 3 of file 'myfile'
+[2018-03-01 07:48:10][Client B] Closing file 'myfile'
+[2018-03-01 07:48:10][Client A] Opening file 'myfile' for READ
+[2018-03-01 07:48:10][Client A] Reading chunk 3 from file 'myfile' (expects: 'Written by B')
+[2018-03-01 07:48:10][Client A] Closing file 'myfile'
+[2018-03-01 07:48:10][Client A] Disconnecting
+[2018-03-01 07:48:10][Client B] Disconnecting
+[2018-03-01 07:48:10][Master] Requesting Client B to stop
+[2018-03-01 07:48:10][Master] Requesting Client A to stop
+
+SUCCESS
+
+
+===================
+
+[TESTS] Running command [~/master -server 10.1.1.7:4444 -test test.json] on Azure VM
+[2018-03-01 07:48:17][Master] Starting test 'CONNECTED -- Observing writes (single write)'
+[2018-03-01 07:48:17][Master] Setting up RPC interface at 10.1.1.6:8484
+[2018-03-01 07:48:17][Client A] Mounting DFS at /tmp/clientA
+[2018-03-01 07:48:17][Client A] DFS mounted
+[2018-03-01 07:48:17][Client B] Mounting DFS at /tmp/clientB
+[2018-03-01 07:48:17][Client B] DFS mounted
+[2018-03-01 07:48:17][Client A] Opening file 'myfile' for WRITE
+[2018-03-01 07:48:18][Client B] Opening file 'myfile' for READ
+[2018-03-01 07:48:18][Client A] Writing 'Writing some content' on chunk 3 of file 'myfile'
+[2018-03-01 07:48:18][Client B] Reading chunk 3 from file 'myfile' (expects: 'Writing some content')
+[2018-03-01 07:48:18][Client A] Closing file 'myfile'
+[2018-03-01 07:48:18][Client B] Closing file 'myfile'
+[2018-03-01 07:48:18][Client A] Disconnecting
+[2018-03-01 07:48:18][Client B] Disconnecting
+[2018-03-01 07:48:18][Master] Requesting Client A to stop
+[2018-03-01 07:48:18][Master] Requesting Client B to stop
+
+SUCCESS
+
+
+===================
+
+[TESTS] Running command [~/master -server 10.1.1.7:4444 -test test.json] on Azure VM
+[2018-03-01 07:48:25][Master] Starting test 'CONNECTED -- Two Clients Open Same File for Writing'
+[2018-03-01 07:48:25][Master] Setting up RPC interface at 10.1.1.6:8484
+[2018-03-01 07:48:25][Client A] Mounting DFS at /tmp/clientA
+[2018-03-01 07:48:25][Client A] DFS mounted
+[2018-03-01 07:48:25][Client B] Mounting DFS at /tmp/clientB
+[2018-03-01 07:48:25][Client B] DFS mounted
+[2018-03-01 07:48:25][Client A] Opening file 'thefile' for WRITE
+[2018-03-01 07:48:25][Client B] Opening file 'thefile' for WRITE [error expected: OpenWriteConflictError]
+[2018-03-01 07:48:25][Client A] Closing file 'thefile'
+[2018-03-01 07:48:26][Client A] Disconnecting
+[2018-03-01 07:48:26][Client B] Disconnecting
+[2018-03-01 07:48:26][Master] Requesting Client A to stop
+[2018-03-01 07:48:26][Master] Requesting Client B to stop
+
+SUCCESS
+
+
+===================
+
+[TESTS] Running command [~/master -server 10.1.1.7:4444 -test test.json] on Azure VM
+[2018-03-01 07:48:33][Master] Starting test 'CONNECTED -- Simple GlobalFileExists'
+[2018-03-01 07:48:33][Master] Setting up RPC interface at 10.1.1.6:8484
+[2018-03-01 07:48:33][Client A] Mounting DFS at /tmp/clientA
+[2018-03-01 07:48:33][Client A] DFS mounted
+[2018-03-01 07:48:33][Client B] Mounting DFS at /tmp/clientB
+[2018-03-01 07:48:33][Client B] DFS mounted
+[2018-03-01 07:48:33][Client A] Opening file 'myfile' for READ
+[2018-03-01 07:48:33][Client A] Closing file 'myfile'
+[2018-03-01 07:48:33][Client B] Checking if file 'thefile' exists globally (expects: true)
+[2018-03-01 07:48:33][Master] Requesting Client A to stop
+[2018-03-01 07:48:33][Master] Requesting Client B to stop
+
+Test ended abruptly with error: Error processing 'GlobalFileExists' by Client B: Expected GlobalFileExists to return true, got false
+
+
+===================
+
+[TESTS] Running command [~/master -server 10.1.1.7:4444 -test test.json] on Azure VM
+[2018-03-01 07:48:41][Master] Starting test 'CONNECTED -- Simple LocalFileExists'
+[2018-03-01 07:48:41][Master] Setting up RPC interface at 10.1.1.6:8484
+[2018-03-01 07:48:41][Client A] Mounting DFS at /tmp/clientA
+[2018-03-01 07:48:41][Client A] DFS mounted
+[2018-03-01 07:48:41][Client A] Opening file 'myfile' for READ
+[2018-03-01 07:48:41][Client A] Closing file 'myfile'
+[2018-03-01 07:48:41][Client A] Checking if file 'thefile' exists locally (expects: true)
+[2018-03-01 07:48:41][Client A] Disconnecting
+[2018-03-01 07:48:41][Master] Requesting Client A to stop
+
+SUCCESS
+
+
+===================
+
+[TESTS] Running command [~/master -server 10.1.1.7:4444 -test test.json] on Azure VM
+[2018-03-01 07:48:47][Master] Starting test 'CONNECTED -- Simple open'
+[2018-03-01 07:48:47][Master] Setting up RPC interface at 10.1.1.6:8484
+[2018-03-01 07:48:47][Client A] Mounting DFS at /tmp/clientA
+[2018-03-01 07:48:47][Client A] DFS mounted
+[2018-03-01 07:48:47][Client A] Opening file 'myfile' for READ
+[2018-03-01 07:48:47][Client A] Closing file 'myfile'
+[2018-03-01 07:48:47][Client A] Disconnecting
+[2018-03-01 07:48:47][Master] Requesting Client A to stop
+
+SUCCESS
+
+
+===================
+
+[TESTS] Running command [~/master -server 10.1.1.7:4444 -test test.json] on Azure VM
+[2018-03-01 07:48:53][Master] Starting test 'CONNECTED -- Simple read'
+[2018-03-01 07:48:53][Master] Setting up RPC interface at 10.1.1.6:8484
+[2018-03-01 07:48:53][Client A] Mounting DFS at /tmp/clientA
+[2018-03-01 07:48:53][Client A] DFS mounted
+[2018-03-01 07:48:53][Client A] Opening file 'myfile' for READ
+[2018-03-01 07:48:53][Client A] Reading chunk 3 from file 'myfile' (expects empty chunk)
+[2018-03-01 07:48:53][Client A] Closing file 'myfile'
+[2018-03-01 07:48:53][Client A] Disconnecting
+[2018-03-01 07:48:53][Master] Requesting Client A to stop
+
+SUCCESS
+
+
+===================
+
+[TESTS] Running command [~/master -server 10.1.1.7:4444 -test test.json] on Azure VM
+[2018-03-01 07:48:59][Master] Starting test 'CONNECTED -- Simple write'
+[2018-03-01 07:48:59][Master] Setting up RPC interface at 10.1.1.6:8484
+[2018-03-01 07:48:59][Client A] Mounting DFS at /tmp/clientA
+[2018-03-01 07:48:59][Client A] DFS mounted
+[2018-03-01 07:48:59][Client A] Opening file 'myfile' for WRITE
+[2018-03-01 07:49:00][Client A] Writing 'Hello from CPSC 416!' on chunk 3 of file 'myfile'
+[2018-03-01 07:49:00][Client A] Reading chunk 3 from file 'myfile' (expects: 'Hello from CPSC 416!')
+[2018-03-01 07:49:00][Client A] Closing file 'myfile'
+[2018-03-01 07:49:00][Client A] Disconnecting
+[2018-03-01 07:49:00][Master] Requesting Client A to stop
+
+SUCCESS
+
+
+===================
+
+[TESTS] Running command [~/master -server 10.1.1.7:4444 -test test.json] on Azure VM
+[2018-03-01 07:49:06][Master] Starting test 'CONNECTED -- Single Client'
+[2018-03-01 07:49:06][Master] Setting up RPC interface at 10.1.1.6:8484
+[2018-03-01 07:49:06][Client A] Mounting DFS at /tmp/clientA
+[2018-03-01 07:49:06][Client A] DFS mounted
+[2018-03-01 07:49:06][Client A] Opening file 'Invalid name!' for WRITE [error expected: BadFilenameError]
+[2018-03-01 07:49:06][Client A] Opening file 'myfile' for WRITE
+[2018-03-01 07:49:06][Client A] Reading chunk 3 from file 'myfile' (expects empty chunk)
+[2018-03-01 07:49:06][Client A] Writing 'Hello from CPSC 416!' on chunk 3 of file 'myfile'
+[2018-03-01 07:49:06][Client A] Reading chunk 3 from file 'myfile' (expects: 'Hello from CPSC 416!')
+[2018-03-01 07:49:06][Client A] Closing file 'myfile'
+[2018-03-01 07:49:07][Client A] Disconnecting
+[2018-03-01 07:49:07][Client B] Mounting DFS at /tmp/clientB
+[2018-03-01 07:49:07][Client B] DFS mounted
+[2018-03-01 07:49:07][Client B] Checking if file 'myfile' exists globally (expects: true)
+[2018-03-01 07:49:07][Client B] Checking if file 'somefile' exists locally (expects: false)
+[2018-03-01 07:49:07][Client B] Opening file 'myfile' for READ [error expected: FileUnavailableError]
+[2018-03-01 07:49:07][Client B] Disconnecting
+[2018-03-01 07:49:07][Master] Requesting Client A to stop
+[2018-03-01 07:49:07][Master] Requesting Client B to stop
+
+SUCCESS
+
+
+===================
+
+[TESTS] Running command [~/master -server 10.1.1.7:4444 -test test.json] on Azure VM
+[2018-03-01 07:49:14][Master] Starting test 'DISCONNECTED -- transitory disconnections should be unobservable'
+[2018-03-01 07:49:14][Master] Setting up RPC interface at 10.1.1.6:8484
+[2018-03-01 07:49:14][Client A] Mounting DFS at /tmp/clientA
+[2018-03-01 07:49:14][Client A] DFS mounted
+[2018-03-01 07:49:14][Client A] Opening file 'thefile' for WRITE
+[2018-03-01 07:49:14][Client A] Writing 'Hello from CPSC 416!' on chunk 3 of file 'thefile'
+[2018-03-01 07:49:14][Client A] Going offline (losing connection with server at 10.1.1.7)
+[2018-03-01 07:49:14][Client A] Going online (able to talk to server at 10.1.1.7)
+[2018-03-01 07:49:14][Client A] Reading chunk 3 from file 'thefile' (expects: 'Hello from CPSC 416!')
+[2018-03-01 07:49:14][Client A] Closing file 'thefile'
+[2018-03-01 07:49:14][Client A] Disconnecting
+[2018-03-01 07:49:14][Master] Requesting Client A to stop
+
+SUCCESS
 
